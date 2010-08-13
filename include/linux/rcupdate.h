@@ -46,8 +46,10 @@
 extern int rcutorture_runnable; /* for sysctl */
 #endif /* #ifdef CONFIG_RCU_TORTURE_TEST */
 
+#define ULONG_CMP_GE(a, b)	(ULONG_MAX / 2 >= (a) - (b))
+#define ULONG_CMP_LT(a, b)	(ULONG_MAX / 2 < (a) - (b))
+
 /* Exported common interfaces */
-extern void rcu_barrier(void);
 extern void rcu_barrier_bh(void);
 extern void rcu_barrier_sched(void);
 extern void synchronize_sched_expedited(void);
@@ -56,9 +58,21 @@ extern int sched_expedited_torture_stats(char *page);
 /* Internal to kernel */
 extern void rcu_init(void);
 
+#ifdef CONFIG_PREEMPT_RCU
+
+/*
+ * Defined as a macro as it is a very low level header included from
+ * areas that don't even know about current.  This gives the rcu_read_lock()
+ * nesting depth, but makes sense only if CONFIG_PREEMPT_RCU -- in other
+ * types of kernel builds, the rcu_read_lock() nesting depth is unknowable.
+ */
+#define rcu_preempt_depth() (current->rcu_read_lock_nesting)
+
+#endif /* #ifdef CONFIG_PREEMPT_RCU */
+
 #if defined(CONFIG_TREE_RCU) || defined(CONFIG_TREE_PREEMPT_RCU)
 #include <linux/rcutree.h>
-#elif defined(CONFIG_TINY_RCU)
+#elif defined(CONFIG_TINY_RCU) || defined(CONFIG_TINY_PREEMPT_RCU)
 #include <linux/rcutiny.h>
 #else
 #error "Unknown RCU implementation specified to kernel configuration"

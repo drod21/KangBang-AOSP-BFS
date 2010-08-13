@@ -44,12 +44,6 @@ extern void __rcu_read_unlock(void);
 extern void synchronize_rcu(void);
 extern void exit_rcu(void);
 
-/*
- * Defined as macro as it is a very low level header
- * included from areas that don't even know about current
- */
-#define rcu_preempt_depth() (current->rcu_read_lock_nesting)
-
 #else /* #ifdef CONFIG_TREE_PREEMPT_RCU */
 
 static inline void __rcu_read_lock(void)
@@ -94,6 +88,8 @@ static inline void synchronize_rcu_bh_expedited(void)
 {
 	synchronize_sched_expedited();
 }
+
+extern void rcu_barrier(void);
 
 extern void rcu_check_callbacks(int cpu, int user);
 
