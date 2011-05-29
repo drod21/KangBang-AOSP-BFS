@@ -1,0 +1,3 @@
+kernel/drivers/misc/bma150_spi.ko
+kernel/drivers/misc/pmic8058-pwm.ko
+kernel/drivers/misc/pmic8058-nfc.ko

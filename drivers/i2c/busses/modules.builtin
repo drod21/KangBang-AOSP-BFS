@@ -1,0 +1,3 @@
+kernel/drivers/i2c/busses/i2c-msm.ko
+kernel/drivers/i2c/busses/i2c-qup.ko
+kernel/drivers/i2c/busses/i2c-ssbi.ko

@@ -1,0 +1,10 @@
+kernel/arch/arm/mach-msm/pmic8058-gpio.ko
+kernel/arch/arm/mach-msm/pmic8058-mpp.ko
+kernel/arch/arm/mach-msm/atmega_microp_common.ko
+kernel/arch/arm/mach-msm/htc_headset_mgr.ko
+kernel/arch/arm/mach-msm/htc_headset_gpio.ko
+kernel/arch/arm/mach-msm/htc_headset_pmic.ko
+kernel/arch/arm/mach-msm/ssbi.ko
+kernel/arch/arm/mach-msm/lte/sdio_al.ko
+kernel/arch/arm/mach-msm/qdsp5v2/snddev_icodec.ko
+kernel/arch/arm/mach-msm/qdsp5v2/lpa.ko
