@@ -1,4 +1,0 @@
-kernel/drivers/mfd/marimba-core.ko
-kernel/drivers/mfd/mfd-core.ko
-kernel/drivers/mfd/marimba-codec.ko
-kernel/drivers/mfd/pmic8058.ko
