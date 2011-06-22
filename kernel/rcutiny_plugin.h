@@ -412,7 +412,7 @@ void call_rcu(struct rcu_head *head, void (*func)(struct rcu_head *rcu))
 {
 	unsigned long flags;
 
-	debug_rcu_head_queue(head);
+	//debug_rcu_head_queue(head);
 	head->func = func;
 	head->next = NULL;
 

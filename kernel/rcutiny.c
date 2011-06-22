@@ -186,7 +186,7 @@ static void rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 	while (list) {
 		next = list->next;
 		prefetch(next);
-		debug_rcu_head_unqueue(list);
+		//debug_rcu_head_unqueue(list);
 		local_bh_disable();
 		list->func(list);
 		local_bh_enable();
@@ -329,5 +329,5 @@ static int __init rcu_spawn_kthreads(void)
 	rcu_cbs_task = kthread_run(rcu_cbs, NULL, "rcu_cbs");
 	return 0;
 }
-early_initcall(rcu_spawn_kthreads)
+early_initcall(rcu_spawn_kthreads);
 
