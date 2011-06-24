@@ -143,6 +143,8 @@ EXPORT_SYMBOL(console_set_on_cmdline);
 /* Flag: console code may call schedule() */
 static int console_may_schedule;
 
+#define MAX_CHARS_PER_RELEASE_LOOP 128
+
 #ifdef CONFIG_PRINTK
 
 static char __log_buf[__LOG_BUF_LEN];
@@ -1024,10 +1026,23 @@ EXPORT_SYMBOL(console_suspend_enabled);
 
 static int __init console_suspend_disable(char *str)
 {
+	/* HTC_20110121_8x60_1070: bypass console suspend disable in 8x60 */
+#ifndef CONFIG_ARCH_MSM8X60
 	console_suspend_enabled = 0;
+#endif
 	return 1;
 }
 __setup("no_console_suspend", console_suspend_disable);
+
+/**
+ *	suspend_console_deferred:
+ *	Parameter to decide whether to defer suspension of console. If set as 1, suspend
+ *	console is deferred to latter stages. Currently used in 8x60 projects only.
+ */
+int suspend_console_deferred;
+module_param_named(
+	suspend_console_deferred, suspend_console_deferred, int, S_IRUGO | S_IWUSR | S_IWGRP
+);
 
 /**
  * suspend_console - suspend the console subsystem
@@ -1147,8 +1162,9 @@ void release_console_sem(void)
 		if (con_start == log_end)
 			break;			/* Nothing to print */
 		_con_start = con_start;
-		_log_end = log_end;
-		con_start = log_end;		/* Flush */
+		_log_end = (con_start + MAX_CHARS_PER_RELEASE_LOOP < log_end) ?
+			con_start + MAX_CHARS_PER_RELEASE_LOOP : log_end;
+		con_start = _log_end;		/* Flush */
 		spin_unlock(&logbuf_lock);
 		stop_critical_timings();	/* don't trace print latency */
 		call_console_drivers(_con_start, _log_end);

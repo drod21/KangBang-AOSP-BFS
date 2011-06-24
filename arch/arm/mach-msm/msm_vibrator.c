@@ -23,13 +23,18 @@
 #include <mach/msm_rpcrouter.h>
 #include <mach/msm_rpc_version.h>
 
+#define VIB_INFO_LOG(fmt, ...) \
+		printk(KERN_INFO "[VIB]" fmt, ##__VA_ARGS__)
+#define VIB_ERR_LOG(fmt, ...) \
+		printk(KERN_ERR "[VIB][ERR]" fmt, ##__VA_ARGS__)
+
 #define PM_LIBPROG	  0x30000061
-#define PMIC_VIBRATOR_LEVEL	(3000)
 
 static struct work_struct vibrator_work;
 static struct hrtimer vibe_timer;
 static spinlock_t vibe_lock;
 static int vibe_state;
+static int pmic_vibrator_level;
 
 static void set_pmic_vibrator(int on)
 {
@@ -47,14 +52,14 @@ static void set_pmic_vibrator(int on)
 		vib_endpoint = msm_rpc_connect(PM_LIBPROG, PM_LIBVERS, 0);
 #endif
 		if (IS_ERR(vib_endpoint)) {
-			printk(KERN_ERR "[Vibrator][ERR] init vib rpc failed!\n");
+			VIB_ERR_LOG("init vib rpc failed!\n");
 			vib_endpoint = 0;
 			return;
 		}
 	}
 
 	if (on)
-		req.data = cpu_to_be32(PMIC_VIBRATOR_LEVEL);
+		req.data = cpu_to_be32(pmic_vibrator_level);
 	else
 		req.data = cpu_to_be32(0);
 
@@ -62,7 +67,7 @@ static void set_pmic_vibrator(int on)
 		sizeof(req), 5 * HZ);
 
 	if (rc < 0)
-		printk(KERN_ERR "[Vibrator][ERR] msm_rpc_call failed!\n");
+		VIB_ERR_LOG("msm_rpc_call failed!\n");
 	else if (on)
 		pr_info("[ATS][set_vibration][successful]\n");
 }
@@ -79,11 +84,11 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	spin_lock_irqsave(&vibe_lock, flags);
 	hrtimer_cancel(&vibe_timer);
 
+	VIB_INFO_LOG(" %s(parent:%s): vibrates %d msec\n",
+			current->comm, current->parent->comm, value);
 	if (value == 0)
 		vibe_state = 0;
 	else {
-		printk(KERN_INFO "[Vibrator] %s(parent:%s): vibrates %d msec\n",
-			current->comm, current->parent->comm, value);
 		value = (value > 15000 ? 15000 : value);
 		vibe_state = 1;
 		hrtimer_start(&vibe_timer,
@@ -93,6 +98,16 @@ static void vibrator_enable(struct timed_output_dev *dev, int value)
 	spin_unlock_irqrestore(&vibe_lock, flags);
 
 	schedule_work(&vibrator_work);
+}
+
+static void set_vibrator_level(struct timed_output_dev *dev, int level)
+{
+	pmic_vibrator_level = level;
+}
+
+static int get_vibrator_level(struct timed_output_dev *dev)
+{
+	return pmic_vibrator_level;
 }
 
 static int vibrator_get_time(struct timed_output_dev *dev)
@@ -106,6 +121,7 @@ static int vibrator_get_time(struct timed_output_dev *dev)
 
 static enum hrtimer_restart vibrator_timer_func(struct hrtimer *timer)
 {
+	VIB_INFO_LOG("%s\n", __func__);
 	vibe_state = 0;
 	schedule_work(&vibrator_work);
 	return HRTIMER_NORESTART;
@@ -115,13 +131,16 @@ static struct timed_output_dev pmic_vibrator = {
 	.name = "vibrator",
 	.get_time = vibrator_get_time,
 	.enable = vibrator_enable,
+	.set_level = set_vibrator_level,
+	.get_level = get_vibrator_level,
 };
 
-void __init msm_init_pmic_vibrator(void)
+void __init msm_init_pmic_vibrator(int level)
 {
 	INIT_WORK(&vibrator_work, update_vibrator);
 
 	spin_lock_init(&vibe_lock);
+	pmic_vibrator_level = level;
 	vibe_state = 0;
 	hrtimer_init(&vibe_timer, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 	vibe_timer.function = vibrator_timer_func;

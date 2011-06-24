@@ -24,7 +24,7 @@
 
 #include "proc_comm.h"
 
-#if defined(CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
 #define MSM_TRIG_A2M_INT(n) (writel(1 << n, MSM_GCC_BASE + 0x8))
 #endif
 
@@ -35,6 +35,8 @@ static inline void notify_other_proc_comm(void)
 {
 #if defined(CONFIG_ARCH_MSM7X30)
 	MSM_TRIG_A2M_INT(6);
+#elif defined(CONFIG_ARCH_MSM8X60)
+	MSM_TRIG_A2M_INT(5);
 #else
 	writel(1, MSM_A2M_INT(6));
 #endif

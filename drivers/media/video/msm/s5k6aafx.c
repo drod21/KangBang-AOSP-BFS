@@ -21,7 +21,8 @@
 #include <linux/i2c.h>
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
-#include <media/msm_camera.h>
+//#include <media/msm_camera.h>
+#include <media/msm_camera_sensor.h>
 #include <mach/gpio.h>
 #include <mach/vreg.h>
 #include "s5k6aafx.h"

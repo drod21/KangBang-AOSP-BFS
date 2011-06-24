@@ -20,6 +20,7 @@
 #include <linux/wakelock.h>
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
+#include <mach/debug_display.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(epson_vsync_wait);
 
@@ -72,7 +73,7 @@ static void epson_wait_vsync(struct msm_panel_data *panel_data)
 	}
 	if (wait_event_timeout(epson_vsync_wait, panel->epson_got_int,
 				HZ/2) == 0)
-		printk(KERN_ERR "timeout waiting for VSYNC\n");
+		PR_DISP_ERR("timeout waiting for VSYNC\n");
 	panel->epson_got_int = 0;
 	/* interrupt clears when screen dma starts */
 }
@@ -91,7 +92,7 @@ static int epson_suspend(struct msm_panel_data *panel_data)
 	ret = bridge_data->uninit(bridge_data, client_data);
 	wake_unlock(&panel->idle_lock);
 	if (ret) {
-		printk(KERN_INFO "mddi epson client: non zero return from "
+		PR_DISP_INFO("mddi epson client: non zero return from "
 			"uninit\n");
 		return ret;
 	}
@@ -180,7 +181,7 @@ static int setup_vsync(struct panel_info *panel,
 			  "vsync", panel);
 	if (ret)
 		goto err_request_irq_failed;
-	printk(KERN_INFO "vsync on gpio %d now %d\n",
+	PR_DISP_INFO("vsync on gpio %d now %d\n",
 	       gpio, gpio_get_value(gpio));
 	return 0;
 
@@ -207,10 +208,10 @@ static int mddi_epson_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	platform_set_drvdata(pdev, panel);
 
-	printk(KERN_DEBUG "%s\n", __func__);
+	PR_DISP_DEBUG("%s\n", __func__);
 
 	if (panel_data->caps & MSMFB_CAP_CABC) {
-		printk(KERN_INFO "CABC enabled\n");
+		PR_DISP_INFO("CABC enabled\n");
 		mddi_eps_cabc.dev.platform_data = client_data;
 		platform_device_register(&mddi_eps_cabc);
 	}

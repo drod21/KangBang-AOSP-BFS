@@ -1366,6 +1366,9 @@ static int l2cap_streaming_send(struct sock *sk)
 	while ((skb = sk->sk_send_head)) {
 		tx_skb = skb_clone(skb, GFP_ATOMIC);
 
+		if (!tx_skb)
+			return -ENOMEM;
+
 		control = get_unaligned_le16(tx_skb->data + L2CAP_HDR_SIZE);
 		control |= pi->next_tx_seq << L2CAP_CTRL_TXSEQ_SHIFT;
 		put_unaligned_le16(control, tx_skb->data + L2CAP_HDR_SIZE);
@@ -1416,6 +1419,10 @@ static void l2cap_retransmit_one_frame(struct sock *sk, u8 tx_seq)
 	}
 
 	tx_skb = skb_clone(skb, GFP_ATOMIC);
+
+	if (!tx_skb)
+		return;
+
 	bt_cb(skb)->retries++;
 	control = get_unaligned_le16(tx_skb->data + L2CAP_HDR_SIZE);
 	control |= (pi->buffer_seq << L2CAP_CTRL_REQSEQ_SHIFT)
@@ -1450,6 +1457,9 @@ static int l2cap_ertm_send(struct sock *sk)
 		}
 
 		tx_skb = skb_clone(skb, GFP_ATOMIC);
+
+		if (!tx_skb)
+			return -ENOMEM;
 
 		bt_cb(skb)->retries++;
 
@@ -3745,6 +3755,10 @@ static int l2cap_streaming_reassembly_sdu(struct sock *sk, struct sk_buff *skb, 
 
 		if (pi->partial_sdu_len == pi->sdu_len) {
 			_skb = skb_clone(pi->sdu, GFP_ATOMIC);
+
+			if (!_skb)
+				return -ENOMEM;
+
 			err = sock_queue_rcv_skb(sk, _skb);
 			if (err < 0)
 				kfree_skb(_skb);
@@ -3810,6 +3824,10 @@ static void l2cap_send_srejframe(struct sock *sk, u8 tx_seq)
 		l2cap_send_sframe(pi, control);
 
 		new = kzalloc(sizeof(struct srej_list), GFP_ATOMIC);
+
+		if (!new)
+			return;
+
 		new->tx_seq = pi->expected_tx_seq++;
 		list_add_tail(&new->list, SREJ_LIST(sk));
 	}

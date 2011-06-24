@@ -44,8 +44,10 @@ static inline void rcu_barrier(void)
 }
 
 #else /* #ifdef CONFIG_TINY_RCU */
+
 void rcu_barrier(void);
 void synchronize_rcu_expedited(void);
+
 #endif /* #else #ifdef CONFIG_TINY_RCU */
 
 static inline void synchronize_rcu_bh(void)

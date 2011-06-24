@@ -41,12 +41,6 @@ void msm_dmov_flush(unsigned int id);
 int msm_dmov_exec_cmd(unsigned id, unsigned int crci_mask, unsigned int cmdptr);
 unsigned int msm_dmov_build_crci_mask(int n, ...);
 
-#ifdef CONFIG_ARCH_MSM8X60
-#define DMOV_BASE_ADDR MSM_DMOV_ADM0_BASE
-#else
-#define DMOV_BASE_ADDR MSM_DMOV_BASE
-#endif
-
 #define DMOV_CRCIS_PER_CONF 10
 
 #define DMOV_ADDR(off, ch, sd) ((DMOV_SD_SIZE*(sd)) + (off) + ((ch) << 2))
@@ -56,20 +50,28 @@ unsigned int msm_dmov_build_crci_mask(int n, ...);
 #define DMOV_SD3(off, ch) DMOV_ADDR(off, ch, 3)
 
 #if defined(CONFIG_ARCH_MSM7X30)
+
 #define DMOV_SD_SIZE 0x400
 #define DMOV_SD_AARM 2
-#define DMOV_SD_AARM_ADDR DMOV_SD2
-#elif defined(CONFIG_ARCH_MSM8X60)
+
+#define DMOV_CE_CHAN_IN		5
+#define DMOV_CE_CHAN_OUT	6
+
+#define DMOV_CE_CRCI_IN		1
+#define DMOV_CE_CRCI_OUT	2
+#define DMOV_CE_CRCI_HASH	3
+
+#elif defined(CONFIG_MSM_ADM3)
 #define DMOV_SD_SIZE 0x800
-#define DMOV_SD_MASTER 0
-#define DMOV_SD_AARM 0
+#define DMOV_SD_MASTER 1
+#define DMOV_SD_AARM 1
 #define DMOV_SD_MASTER_ADDR(off, ch) DMOV_ADDR(off, ch, DMOV_SD_MASTER)
-#define DMOV_SD_AARM_ADDR(off, ch) DMOV_ADDR(off, ch, DMOV_SD_AARM)
 #else
 #define DMOV_SD_SIZE 0x400
 #define DMOV_SD_AARM 3
-#define DMOV_SD_AARM_ADDR DMOV_SD3
 #endif
+
+#define DMOV_SD_AARM_ADDR(off, ch) DMOV_ADDR(off, ch, DMOV_SD_AARM)
 
 #define DMOV_CMD_PTR(ch)      DMOV_SD_AARM_ADDR(0x000, ch)
 #define DMOV_CMD_LIST         (0 << 29) /* does not work */
@@ -148,13 +150,20 @@ unsigned int msm_dmov_build_crci_mask(int n, ...);
 #define DMOV_NAND_CRCI_CMD     15
 #define DMOV_NAND_CRCI_DATA    3
 
-#define DMOV_CE_IN_CHAN       5
-#define DMOV_CE_IN_CHAN_TZ     11
-#define DMOV_CE_IN_CRCI       1
+#define DMOV_CE_CHAN_IN		11
+#define DMOV_CE_CHAN_OUT	12
 
-#define DMOV_CE_OUT_CHAN      6
+#define DMOV_CE_CRCI_IN		4
+#define DMOV_CE_CRCI_OUT	5
+#define DMOV_CE_CRCI_HASH	15
+
+#define DMOV_CE_IN_CHAN        5
+#define DMOV_CE_IN_CHAN_TZ     11
+#define DMOV_CE_IN_CRCI        1
+
+#define DMOV_CE_OUT_CHAN       6
 #define DMOV_CE_OUT_CHAN_TZ    12
-#define DMOV_CE_OUT_CRCI      2
+#define DMOV_CE_OUT_CRCI       2
 
 #define DMOV_SDC1_CHAN         18
 #define DMOV_SDC1_CRCI         1

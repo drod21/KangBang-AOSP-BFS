@@ -20,48 +20,36 @@
 #include <mach/camera.h>
 #define MSM_AXI_QOS_NAME "msm_camera"
 
-static uint8_t axi_qos_requested;
+static struct pm_qos_request_list *pm_qos_req;
 
-int request_axi_qos(uint32_t freq)
+int add_axi_qos(void)
 {
-	int rc = 0;
-	if (!axi_qos_requested) {
-		rc = pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-			MSM_AXI_QOS_NAME, freq);
-		if (rc < 0)
-			CDBG("request AXI bus QOS fails. rc = %d\n",
-				rc);
-		else {
-			CDBG("%s: request successful\n", __func__);
-			axi_qos_requested = 1;
-			//msleep(5);
+	pm_qos_req = pm_qos_add_request(PM_QOS_SYSTEM_BUS_FREQ,
+					PM_QOS_DEFAULT_VALUE);
+	if (!pm_qos_req) {
+		CDBG("request AXI bus QOS fails.\n");
+		return -1;
 		}
-	}
-	return rc;
+
+	return 0;
 }
 
-int update_axi_qos(uint32_t freq)
+int update_axi_qos(uint32_t rate)
 {
-	int rc = 0;
-	if (axi_qos_requested) {
-		rc = pm_qos_update_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-			MSM_AXI_QOS_NAME, freq);
-		if (rc < 0)
-			CDBG("update AXI bus QOS fails. rc = %d\n",
-				rc);
-		else
-			CDBG("%s: request successful\n", __func__);
+	if (!pm_qos_req) {
+		CDBG("add_axi_qos() has not been called\n");
+		return -1;
 	}
-	return rc;
+
+	pm_qos_update_request(pm_qos_req, rate);
+	return 0;
 }
 
 void release_axi_qos(void)
 {
-	if (axi_qos_requested) {
-		pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ,
-			MSM_AXI_QOS_NAME);
-		CDBG("%s: release successful\n", __func__);
-		axi_qos_requested = 0;
-		//msleep(5);
+	if (!pm_qos_req) {
+		CDBG("add_axi_qos() has not been called\n");
 	}
+
+	pm_qos_remove_request(pm_qos_req);
 }

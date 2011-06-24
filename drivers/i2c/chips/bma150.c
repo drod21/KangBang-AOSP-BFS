@@ -24,7 +24,9 @@
 
 /*#define EARLY_SUSPEND_BMA 1*/
 
-#define E(x...) printk(KERN_ERR "BMA150 ERROR: " x)
+#define D(x...) pr_info("[GSNR][BMA150] " x)
+#define E(x...) printk(KERN_ERR "[GSNR][BMA150 ERROR] " x)
+#define DIF(x...) if (debug_flag) printk(KERN_DEBUG "[GSNR][BMA150 DEBUG] " x)
 
 static struct i2c_client *this_client;
 
@@ -38,6 +40,8 @@ static struct bma150_platform_data *pdata;
 static atomic_t PhoneOn_flag = ATOMIC_INIT(0);
 #define DEVICE_ACCESSORY_ATTR(_name, _mode, _show, _store) \
 struct device_attribute dev_attr_##_name = __ATTR(_name, _mode, _show, _store)
+
+static int debug_flag;
 
 static int BMA_I2C_RxData(char *rxData, int length)
 {
@@ -63,13 +67,12 @@ static int BMA_I2C_RxData(char *rxData, int length)
 		else
 			mdelay(10);
 	}
+
 	if (retry > 100) {
 		E("%s: retry over 100\n", __func__);
 		return -EIO;
-	}	else
-	return 0;
-
-
+	} else
+		return 0;
 }
 
 static int BMA_I2C_TxData(char *txData, int length)
@@ -90,11 +93,12 @@ static int BMA_I2C_TxData(char *txData, int length)
 		else
 			mdelay(10);
 	}
+
 	if (retry > 100) {
 		E("%s: retry over 100\n", __func__);
 		return -EIO;
-	}	else
-	return 0;
+	} else
+		return 0;
 }
 static int BMA_Init(void)
 {
@@ -119,11 +123,13 @@ static int BMA_TransRBuff(short *rbuf)
 {
 	char buffer[6];
 	int ret;
+
 	memset(buffer, 0, 6);
+
 	buffer[0] = X_AXIS_LSB_REG;
 	ret = BMA_I2C_RxData(buffer, 6);
 	if (ret < 0)
-		return 0;
+		return ret;
 	rbuf[0] = buffer[1]<<2|buffer[0]>>6;
 	if (rbuf[0]&0x200)
 		rbuf[0] -= 1<<10;
@@ -133,58 +139,23 @@ static int BMA_TransRBuff(short *rbuf)
 	rbuf[2] = buffer[5]<<2|buffer[4]>>6;
 	if (rbuf[2]&0x200)
 		rbuf[2] -= 1<<10;
+
+	DIF("%s: (x, y, z) = (%d, %d, %d)\n",
+		__func__, rbuf[0], rbuf[1], rbuf[2]);
+
 	return 1;
 }
-/*
-static int BMA_set_range(char range)
-{
-	char buffer[2];
-	int ret;
-	buffer[0] = RANGE_BWIDTH_REG;
-	ret = BMA_I2C_RxData(buffer, 1);
-	if (ret < 0)
-		return -1;
-	buffer[1] = (buffer[0]&0xe7)|range<<3;
-	buffer[0] = RANGE_BWIDTH_REG;
-	ret = BMA_I2C_TxData(buffer, 2);
 
-	return ret;
-}
-*/
-/*
-static int BMA_get_range(void)
-{
-	char buffer;
-	int ret;
-	buffer = RANGE_BWIDTH_REG;
-	ret = BMA_I2C_RxData(&buffer, 1);
-	if (ret < 0)
-		return -1;
-	buffer = (buffer&0x18)>>3;
-	return buffer;
-}
-*/
-/*
-static int BMA_reset_int(void)
-{
-	char buffer[2];
-	int ret;
-	buffer[0] = SMB150_CTRL_REG;
-	ret = BMA_I2C_RxData(buffer, 1);
-	if (ret < 0)
-		return -1;
-	buffer[1] = (buffer[0]&0xbf)|0x40;
-	buffer[0] = SMB150_CTRL_REG;
-	ret = BMA_I2C_TxData(buffer, 2);
-
-	return ret;
-}
-*/
 /* set  operation mode 0 = normal, 1 = sleep*/
 static int BMA_set_mode(char mode)
 {
 	char buffer[2] = "";
-	int ret;
+	int ret = 0;
+
+	printk(KERN_INFO "[GSNR] Gsensor %s\n", mode ? "disable" : "enable");
+
+	memset(buffer, 0, 2);
+
 	buffer[0] = SMB150_CTRL_REG;
 	ret = BMA_I2C_RxData(buffer, 1);
 	if (ret < 0)
@@ -222,6 +193,8 @@ static int bma_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	int ret = -1;
 	short buf[8], temp;
 	int kbuf = 0;
+
+	DIF("%s: cmd = 0x%x\n", __func__, cmd);
 
 	switch (cmd) {
 	case BMA_IOCTL_READ:
@@ -283,6 +256,8 @@ static int bma_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			rwbuf[1] = (pdata->gs_kvalue >>  8) & 0xFF;
 			rwbuf[2] =  pdata->gs_kvalue        & 0xFF;
 		}
+		DIF("%s: CALI(x, y, z) = (%d, %d, %d)\n",
+			__func__, rwbuf[0], rwbuf[1], rwbuf[2]);
 		break;
 	case BMA_IOCTL_SET_MODE:
 		BMA_set_mode(rwbuf[0]);
@@ -374,7 +349,7 @@ static ssize_t bma150_show(struct device *dev,
 {
 	char *s = buf;
 	s += sprintf(s, "%d\n", atomic_read(&PhoneOn_flag));
-	return (s - buf);
+	return s - buf;
 }
 static ssize_t bma150_store(struct device *dev,
 				   struct device_attribute *attr,
@@ -399,6 +374,45 @@ static ssize_t bma150_store(struct device *dev,
 
 static DEVICE_ACCESSORY_ATTR(PhoneOnOffFlag, 0664, \
 	bma150_show, bma150_store);
+
+static ssize_t debug_flag_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	char *s = buf;
+	char buffer, range = -1, bandwidth = -1, mode = -1;
+	int ret;
+
+	buffer = RANGE_BWIDTH_REG;
+	ret = BMA_I2C_RxData(&buffer, 1);
+	if (ret < 0)
+		return -1;
+	range = (buffer & 0x18) >> 3;
+	bandwidth = (buffer & 0x7);
+
+	buffer = SMB150_CTRL_REG;
+	ret = BMA_I2C_RxData(&buffer, 1);
+	if (ret < 0)
+		return -1;
+	mode = (buffer & 0x1);
+
+	s += sprintf(s, "debug_flag = %d, range = 0x%x, bandwidth = 0x%x, "
+		"mode = 0x%x\n", debug_flag, range, bandwidth, mode);
+
+	return s - buf;
+}
+static ssize_t debug_flag_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	debug_flag = -1;
+	sscanf(buf, "%d", &debug_flag);
+
+	return count;
+
+}
+
+static DEVICE_ACCESSORY_ATTR(debug_en, 0664, \
+	debug_flag_show, debug_flag_store);
 
 int bma150_registerAttr(void)
 {
@@ -426,8 +440,15 @@ int bma150_registerAttr(void)
 	if (ret)
 		goto err_create_accelerometer_device_file;
 
+	/* register the debug_en attributes */
+	ret = device_create_file(accelerometer_dev, &dev_attr_debug_en);
+	if (ret)
+		goto err_create_accelerometer_debug_en_device_file;
+
 	return 0;
 
+err_create_accelerometer_debug_en_device_file:
+	device_remove_file(accelerometer_dev, &dev_attr_PhoneOnOffFlag);
 err_create_accelerometer_device_file:
 	device_unregister(accelerometer_dev);
 err_create_accelerometer_device:
@@ -503,9 +524,12 @@ int bma150_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		E("%s: set spi_bma150_registerAttr fail!\n", __func__);
 		goto err_registerAttr;
 	}
-	return 0;
-err_registerAttr:
 
+	debug_flag = 0;
+
+	return 0;
+
+err_registerAttr:
 exit_misc_device_register_failed:
 exit_init_failed:
 exit_platform_data_null:

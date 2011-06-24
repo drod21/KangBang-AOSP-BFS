@@ -1,6 +1,7 @@
 /* include/linux/android_pmem.h
  *
  * Copyright (C) 2007 Google, Inc.
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -15,20 +16,6 @@
 
 #ifndef _ANDROID_PMEM_H_
 #define _ANDROID_PMEM_H_
-
-#include <linux/fs.h>
-
-#define PMEM_KERNEL_TEST_MAGIC 0xc0
-#define PMEM_KERNEL_TEST_NOMINAL_TEST_IOCTL \
-	_IO(PMEM_KERNEL_TEST_MAGIC, 1)
-#define PMEM_KERNEL_TEST_ADVERSARIAL_TEST_IOCTL \
-	_IO(PMEM_KERNEL_TEST_MAGIC, 2)
-#define PMEM_KERNEL_TEST_HUGE_ALLOCATION_TEST_IOCTL \
-	_IO(PMEM_KERNEL_TEST_MAGIC, 3)
-#define PMEM_KERNEL_TEST_FREE_UNALLOCATED_TEST_IOCTL \
-	_IO(PMEM_KERNEL_TEST_MAGIC, 4)
-#define PMEM_KERNEL_TEST_LARGE_REGION_NUMBER_TEST_IOCTL \
-	_IO(PMEM_KERNEL_TEST_MAGIC, 5)
 
 #include <linux/fs.h>
 
@@ -61,12 +48,18 @@
  * struct (with offset set to 0). 
  */
 #define PMEM_GET_TOTAL_SIZE	_IOW(PMEM_IOCTL_MAGIC, 7, unsigned int)
-#define PMEM_CACHE_FLUSH        _IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+/* Revokes gpu registers and resets the gpu.  Pass a pointer to the
+ * start of the mapped gpu regs (the vaddr returned by mmap) as the argument.
+ */
+#define HW3D_REVOKE_GPU		_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+#define PMEM_CACHE_FLUSH	_IOW(PMEM_IOCTL_MAGIC, 8, unsigned int)
+#define HW3D_GRANT_GPU		_IOW(PMEM_IOCTL_MAGIC, 9, unsigned int)
 
 #define PMEM_CLEAN_INV_CACHES	_IOW(PMEM_IOCTL_MAGIC, 11, unsigned int)
 #define PMEM_CLEAN_CACHES	_IOW(PMEM_IOCTL_MAGIC, 12, unsigned int)
 #define PMEM_INV_CACHES		_IOW(PMEM_IOCTL_MAGIC, 13, unsigned int)
 
+#define PMEM_GET_FREE_SPACE	_IOW(PMEM_IOCTL_MAGIC, 14, unsigned int)
 #define PMEM_ALLOCATE_ALIGNED	_IOW(PMEM_IOCTL_MAGIC, 15, unsigned int)
 struct pmem_region {
 	unsigned long offset;
@@ -77,6 +70,11 @@ struct pmem_addr {
 	unsigned long vaddr;
 	unsigned long offset;
 	unsigned long length;
+};
+
+struct pmem_freespace {
+	unsigned long total;
+	unsigned long largest;
 };
 
 struct pmem_allocation {
@@ -94,6 +92,7 @@ enum pmem_allocator_type {
 	 * defined
 	 */
 	PMEM_ALLOCATORTYPE_BITMAP = 0, /* forced to be zero here */
+	PMEM_ALLOCATORTYPE_SYSTEM,
 
 	PMEM_ALLOCATORTYPE_ALLORNOTHING,
 	PMEM_ALLOCATORTYPE_BUDDYBESTFIT,
@@ -104,7 +103,7 @@ enum pmem_allocator_type {
 #define PMEM_MEMTYPE_MASK 0x7
 #define PMEM_INVALID_MEMTYPE 0x0
 #define PMEM_MEMTYPE_EBI1 0x1
-#define PMEM_MEMTYPE_RESERVED_INVALID1 0x2
+#define PMEM_MEMTYPE_SMI  0x2
 #define PMEM_MEMTYPE_RESERVED_INVALID2 0x3
 #define PMEM_MEMTYPE_RESERVED_INVALID3 0x4
 #define PMEM_MEMTYPE_RESERVED_INVALID4 0x5
@@ -119,7 +118,7 @@ enum pmem_allocator_type {
 
 /* kernel api names for board specific data structures */
 #define PMEM_KERNEL_EBI1_DATA_NAME "pmem_kernel_ebi1"
-
+#define PMEM_KERNEL_SMI_DATA_NAME "pmem_kernel_smi"
 
 struct android_pmem_platform_data
 {
@@ -129,6 +128,7 @@ struct android_pmem_platform_data
 	/* size of memory region */
 	unsigned long size;
 
+	enum pmem_allocator_type allocator_type;
 	/* set to indicate the region should not be managed with an allocator */
 	enum pmem_allocator_type no_allocator;
 	/* treated as a 'hidden' variable in the board files. Can be
@@ -143,6 +143,7 @@ struct android_pmem_platform_data
 	unsigned cached;
 	/* The MSM7k has bits to enable a write buffer in the bus controller*/
 	unsigned buffered;
+	/* This PMEM is on memory that may be powered off */
 	unsigned unstable;
 };
 
@@ -151,7 +152,9 @@ int32_t pmem_kalloc(const size_t size, const uint32_t flags);
 int32_t pmem_kfree(const int32_t physaddr);
 
 #ifdef CONFIG_ANDROID_PMEM
+#ifndef CONFIG_ARCH_MSM8X60
 int is_pmem_file(struct file *file);
+#endif
 unsigned long get_pmem_id_addr(int id);
 int get_pmem_file(unsigned int fd, unsigned long *start, unsigned long *vstart,
 		  unsigned long *end, struct file **filp);

@@ -35,10 +35,16 @@ struct mdp_device;
 #define MSM_MDP_DMA_PACK_ALIGN_LSB		(1 << 4)
 #define MSM_MDP_RGB_PANEL_SELE_REFRESH		(1 << 5)
 #define MSM_MDP_ABL_ENABLE			(1 << 6)
+#define MSM_MDP_FORCE_UPDATE			(1 << 7)
+
 
 /* mddi type */
 #define MSM_MDP_MDDI_TYPE_I	 0
 #define MSM_MDP_MDDI_TYPE_II	 1
+
+
+/* fb override operations */
+#define MSM_FB_PM_DISABLE				(1<<0)
 
 struct fb_cmap;
 struct mdp_histogram;
@@ -50,6 +56,7 @@ struct msm_fb_data {
 	int width;	/* disply width in mm */
 	int height;	/* display height in mm */
 	unsigned output_format;
+	unsigned overrides;
 };
 
 struct msmfb_callback {
@@ -61,6 +68,7 @@ enum {
 	MSM_MDDI_EMDH_INTERFACE,
 	MSM_EBI2_INTERFACE,
 	MSM_LCDC_INTERFACE,
+	MSM_DTV_INTERFACE,
 	MSM_TV_INTERFACE,
 
 	MSM_MDP_NUM_INTERFACES = MSM_TV_INTERFACE + 1
@@ -275,6 +283,8 @@ struct mdp_device {
 
 struct class_interface;
 int register_mdp_client(struct class_interface *class_intf);
+
+int register_dtv_client(struct class_interface *class_intf);
 
 /**** private client data structs go below this line ***/
 

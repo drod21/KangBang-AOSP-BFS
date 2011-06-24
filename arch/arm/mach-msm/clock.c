@@ -28,10 +28,10 @@
 #include <linux/device.h>
 #include <linux/seq_file.h>
 #include <linux/pm_qos_params.h>
+#include "mach/socinfo.h"
 
 #include "clock.h"
 #include "proc_comm.h"
-#include "socinfo.h"
 
 #define DEFERCLK_TIMEOUT (HZ/2)
 
@@ -74,17 +74,21 @@ static void defer_clk_expired(unsigned long data)
  */
 static inline int pc_clk_enable(unsigned id)
 {
+	#if 0
 	/* gross hack to set axi clk rate when turning on uartdm clock */
 	if (id == UART1DM_CLK && axi_clk)
 		clk_set_rate_locked(axi_clk, 128000000);
+	#endif
 	return msm_proc_comm(PCOM_CLKCTL_RPC_ENABLE, &id, NULL);
 }
 
 static inline void pc_clk_disable(unsigned id)
 {
 	msm_proc_comm(PCOM_CLKCTL_RPC_DISABLE, &id, NULL);
+	#if 0
 	if (id == UART1DM_CLK && axi_clk)
 		clk_set_rate_locked(axi_clk, 0);
+	#endif
 }
 
 static int pc_clk_reset(unsigned id, enum clk_reset_action action)
@@ -663,7 +667,6 @@ static int param_get_min_axi(char *buffer, struct kernel_param *kp)
 
 module_param_call(min_axi_khz, param_set_min_axi,
 	param_get_min_axi, &min_axi_khz, S_IWUSR | S_IRUGO);
-
 
 /* The bootloader and/or AMSS may have left various clocks enabled.
  * Disable any clocks that belong to us (CLKFLAG_AUTO_OFF) but have

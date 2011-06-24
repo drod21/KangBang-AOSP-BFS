@@ -738,6 +738,7 @@ reg_analog_settings_saga_zero_shutter[] = {
 	{0x30C1, 0x01},		/* pack video enable [0] */
 	{0x30EE, 0x02},		/* DPHY enable [1] */
 	{0x3111, 0x86},		/* Embedded data off [5] */
+	{0x0105, 0x01},		/* for corrupted frame */
 	/* For MIPI T8 T9 */
 	{0x30E3, 0x38},		/* outif_mld_ulpm_rxinit_limit[15:8] */
 	{0x30E4, 0x40},		/* outif_mld_ulpm_rxinit_limit[7:0] */

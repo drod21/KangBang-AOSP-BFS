@@ -180,6 +180,12 @@ config XEN_KBDDEV_FRONTEND
 	  keyboard and mouse device driver.  It communicates with a back-end
 	  in another domain.
 
+config INPUT_VNCINPUT
+	bool "VNC input"
+	default n
+	help
+	  This driver implements for VNC input.
+
 comment "Input Device Drivers"
 
 source "drivers/input/keyboard/Kconfig"

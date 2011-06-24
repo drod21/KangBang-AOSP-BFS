@@ -77,6 +77,7 @@
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
 #include <linux/mutex.h>
+#include <mach/debug_display.h>
 
 #include "mdp_hw.h"
 #include "mdp4.h"
@@ -89,6 +90,8 @@
 extern struct panel_icm_info *panel_icm;
 extern wait_queue_head_t panel_update_wait_queue;
 #endif
+extern int get_fb_phys_info(unsigned long *start, unsigned long *len, int fb_num);
+
 static int z_order_change = 0;
 
 struct mdp4_overlay_ctrl {
@@ -153,6 +156,8 @@ void mdp4_overlay_dmae_cfg(struct mdp4_overlay_pipe *pipe, int atv)
 		    DMA_DSTC1B_8BITS | DMA_DSTC2R_8BITS;
 	}
 
+	dmae_cfg_reg |= DMA_PACK_PATTERN_RGB;
+
 	/* dma2 config register */
 	mdp_writel(pipe->mdp, dmae_cfg_reg, 0xb0000);
 
@@ -191,39 +196,40 @@ void mdp4_overlay_parameters_check(struct mdp4_overlay_pipe *pipe)
 		return;
 
 	if(pipe->dst_x < 0 || pipe->dst_x > pipe->mdp->mdp_dev.width) {
-		printk(KERN_ERR "%s(%d) Incorrect parameter dstx=%d", __func__, __LINE__, pipe->dst_x);
+		PR_DISP_ERR("%s(%d) Incorrect parameter dstx=%d", __func__, __LINE__, pipe->dst_x);
 		pipe->dst_x = 0;
 	}
 
 	if(pipe->dst_y < 0 || pipe->dst_y > pipe->mdp->mdp_dev.height) {
-		printk(KERN_ERR "%s(%d) Incorrect parameter dsty=%d", __func__, __LINE__, pipe->dst_y);
+		PR_DISP_ERR("%s(%d) Incorrect parameter dsty=%d", __func__, __LINE__, pipe->dst_y);
 		pipe->dst_y = 0;
 	}
 
 	if(pipe->dst_w < 0 || pipe->dst_w > pipe->mdp->mdp_dev.width) {
-		printk(KERN_ERR "%s(%d) Incorrect parameter dstw=%d", __func__, __LINE__, pipe->dst_w);
+		PR_DISP_ERR("%s(%d) Incorrect parameter dstw=%d", __func__, __LINE__, pipe->dst_w);
 		pipe->dst_w = pipe->mdp->mdp_dev.width;
 	}
 
 	if(pipe->dst_y < 0 || pipe->dst_y > pipe->mdp->mdp_dev.height) {
-		printk(KERN_ERR "%s(%d) Incorrect parameter dsty=%d", __func__, __LINE__, pipe->dst_y);
+		PR_DISP_ERR("%s(%d) Incorrect parameter dsty=%d", __func__, __LINE__, pipe->dst_y);
 		pipe->dst_y = pipe->mdp->mdp_dev.height;
 	}
 
 	if(pipe->dst_w + pipe->dst_x > pipe->mdp->mdp_dev.width) {
 		dst_neww = pipe->mdp->mdp_dev.width - pipe->dst_x;
-		printk(KERN_ERR "%s(%d) Incorrect parameter dstx=%d dstw=%d found, change new dstw=%d", __func__, __LINE__,
+		PR_DISP_ERR("%s(%d) Incorrect parameter dstx=%d dstw=%d found, change new dstw=%d", __func__, __LINE__,
 			pipe->dst_x, pipe->dst_w, dst_neww);
 		pipe->dst_w = dst_neww;
 	}
 
 	if(pipe->dst_h + pipe->dst_y > pipe->mdp->mdp_dev.height) {
 		dst_newh = pipe->mdp->mdp_dev.height - pipe->dst_y;
-		printk(KERN_ERR "%s(%d) Incorrect parameter dsty=%d dsth=%d found, change new dsth=%d", __func__, __LINE__,
+		PR_DISP_ERR("%s(%d) Incorrect parameter dsty=%d dsth=%d found, change new dsth=%d", __func__, __LINE__,
 			pipe->dst_y, pipe->dst_h, dst_newh);
 		pipe->dst_h = dst_newh;
 	}
 }
+
 
 void mdp4_overlay_dmap_cfg(struct mdp4_overlay_pipe *pipe, int lcdc)
 {
@@ -413,7 +419,9 @@ void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe)
 	pattern = mdp4_overlay_unpack_pattern(pipe);
 
 #ifdef MDP4_IGC_LUT_ENABLE
-	pipe->op_mode |= MDP4_OP_IGC_LUT_EN;
+	pipe->op_mode = MDP4_OP_IGC_LUT_EN;
+#else
+	pipe->op_mode = 0;
 #endif
 
         /* workaroud for the panel with wrong direction */
@@ -472,13 +480,16 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	format = mdp4_overlay_format(pipe);
 	pattern = mdp4_overlay_unpack_pattern(pipe);
 
+#ifdef MDP4_IGC_LUT_ENABLE
+	pipe->op_mode = MDP4_OP_IGC_LUT_EN;
+#else
+	pipe->op_mode = 0;
+#endif
+
 	/* not RGB use VG pipe */
 	if (pipe->pipe_type != OVERLAY_TYPE_RGB)
 		pipe->op_mode |= (MDP4_OP_CSC_EN | MDP4_OP_SRC_DATA_YCBCR);
 
-#ifdef MDP4_IGC_LUT_ENABLE
-	pipe->op_mode |= MDP4_OP_IGC_LUT_EN;
-#endif
 
 	mdp4_scale_setup(pipe);
 
@@ -499,10 +510,8 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	else
 		dst_xy |= pipe->dst_x;
 
-
-
 	if(pipe->dst_x < 0 || pipe->dst_y < 0)
-		printk(KERN_ERR "%s(%d) Incorrect overlay input pipex=%d pipey=%d newx=%d newy=%d width=%d height=%d\n", __func__, __LINE__, pipe->dst_x, pipe->dst_y, dst_newx, dst_newy, pipe->mdp->mdp_dev.width, pipe->mdp->mdp_dev.height);
+		PR_DISP_ERR("%s(%d) Incorrect overlay input pipex=%d pipey=%d newx=%d newy=%d width=%d height=%d\n", __func__, __LINE__, pipe->dst_x, pipe->dst_y, dst_newx, dst_newy, pipe->mdp->mdp_dev.width, pipe->mdp->mdp_dev.height);
 
 	mdp_writel(pipe->mdp, src_size, vg_base + 0x0000);	/* MDP_RGB_SRC_SIZE */
 	mdp_writel(pipe->mdp, src_xy, vg_base + 0x0004);	/* MDP_RGB_SRC_XY */
@@ -515,6 +524,7 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 
 	/* chroma component plane */
 	mdp_writel(pipe->mdp, pipe->srcp1_addr, vg_base + 0x0014);
+
 
 	mdp_writel(pipe->mdp, pipe->srcp1_ystride << 16 | pipe->srcp0_ystride, vg_base + 0x0040);
 
@@ -939,6 +949,7 @@ void mdp4_overlayproc_cfg(struct mdp4_overlay_pipe *pipe)
 	data = pipe->src_height;
 	data <<= 16;
 	data |= pipe->src_width;
+	mdp_writel(pipe->mdp, data, overlay_base + 0x0008); /* ROI, height + width */
        /*
         * BLT only siupport at primary display
         */
@@ -949,7 +960,6 @@ void mdp4_overlayproc_cfg(struct mdp4_overlay_pipe *pipe)
 		mddi = mdp_readl(pipe->mdp, 0x0038);
 		mddi &= 0x02;
 
-		mdp_writel(pipe->mdp, data, overlay_base + 0x0008); /* ROI, height + width */
 		if (!mddi){
                        mdp_writel(pipe->mdp, pipe->blt_addr, overlay_base + 0x000c);
                        mdp_writel(pipe->mdp, pipe->src_width * 2, overlay_base + 0x0010);
@@ -1018,7 +1028,6 @@ int mdp4_overlay_active(struct mdp_info* mdp, int mixer)
 void mdp4_mixer_stage_up(struct mdp4_overlay_pipe *pipe)
 {
 	uint32_t data, mask, snum, stage, mixer, pnum;
-
 
 	stage = pipe->mixer_stage;
 	mixer = pipe->mixer_num;
@@ -1108,37 +1117,27 @@ void mdp4_mixer_blend_setup(struct mdp4_overlay_pipe *pipe)
 	bg_pipe = mdp4_overlay_stage_pipe(pipe->mixer_num,
 					MDP4_MIXER_STAGE_BASE);
 	if (bg_pipe == NULL) {
-		printk(KERN_INFO "%s: Error: no bg_pipe\n", __func__);
+		PR_DISP_INFO("%s: Error: no bg_pipe\n", __func__);
 		return;
 	}
 
 
 	blend_op = 0;
-
-	if (bg_pipe->alpha_enable && pipe->alpha_enable) {
-		/* both pipe are ARGB */
-		blend_op |= (MDP4_BLEND_FG_ALPHA_BG_PIXEL |
+	if (pipe->is_fg) {
+		blend_op |= (MDP4_BLEND_FG_ALPHA_FG_CONST |
+				MDP4_BLEND_BG_ALPHA_BG_CONST);
+		mdp_writel(pipe->mdp, pipe->alpha, overlay_base + off + 0x108);
+		mdp_writel(pipe->mdp, 0xff - pipe->alpha, overlay_base + off + 0x10c);
+	} else {
+		if (bg_pipe->alpha_enable && pipe->alpha_enable) {
+			/* both pipe have alpha */
+			blend_op |= (MDP4_BLEND_FG_ALPHA_BG_PIXEL |
 				MDP4_BLEND_FG_INV_ALPHA |
 				MDP4_BLEND_BG_ALPHA_BG_PIXEL);
 	} else if (bg_pipe->alpha_enable && pipe->alpha_enable == 0) {
 		blend_op = (MDP4_BLEND_BG_ALPHA_BG_PIXEL |
 				MDP4_BLEND_FG_ALPHA_BG_PIXEL |
 				MDP4_BLEND_FG_INV_ALPHA);
-	} else if (bg_pipe->alpha_enable == 0 && pipe->alpha_enable) {
-		blend_op = (MDP4_BLEND_FG_ALPHA_FG_PIXEL |
-				MDP4_BLEND_BG_ALPHA_FG_PIXEL |
-				MDP4_BLEND_BG_INV_ALPHA);
-	} else if (bg_pipe->alpha_enable == 0 && pipe->alpha_enable == 0) {
-		/* not ARGB on both pipe */
-		blend_op |= (MDP4_BLEND_FG_ALPHA_FG_CONST |
-					MDP4_BLEND_BG_ALPHA_BG_CONST);
-		if (pipe->is_fg) {
-
-			mdp_writel(pipe->mdp, pipe->alpha, overlay_base + off + 0x108);
-			mdp_writel(pipe->mdp, 0xff - pipe->alpha, overlay_base + off + 0x10c);
-		} else {
-			mdp_writel(pipe->mdp, 0xff - pipe->alpha, overlay_base + off + 0x108);
-			mdp_writel(pipe->mdp, pipe->alpha, overlay_base + off + 0x10c);
 		}
 	}
 
@@ -1227,14 +1226,14 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(int ptype, bool usevg)
 	for (; i < MDP4_MAX_PIPE; i++) {
 		if (pipe->pipe_type == ptype && pipe->pipe_used == 0) {
 			init_completion(&pipe->comp);
-			printk(KERN_INFO "mdp4_overlay_pipe_alloc: pipe=%x ndx=%d\n",
+			PR_DISP_INFO("mdp4_overlay_pipe_alloc: pipe=%x ndx=%d\n",
 				(int)pipe, pipe->pipe_ndx);
 			return pipe;
 		}
 		pipe++;
 	}
 
-	printk(KERN_INFO "mdp4_overlay_pipe_alloc: ptype=%d FAILED\n",
+	PR_DISP_INFO("mdp4_overlay_pipe_alloc: ptype=%d FAILED\n",
                                                         ptype);
 
 	return NULL;
@@ -1246,7 +1245,7 @@ void mdp4_overlay_pipe_free(struct mdp4_overlay_pipe *pipe)
 	uint32_t ptype, num, ndx;
 	struct mdp4_pipe_desc  *pd;
 
-	printk(KERN_INFO "mdp4_overlay_pipe_free: pipe=%x ndx=%d\n",
+	PR_DISP_INFO("mdp4_overlay_pipe_free: pipe=%x ndx=%d\n",
 					(int)pipe, pipe->pipe_ndx);
 	pd = &ctrl->ov_pipe[pipe->pipe_num];
 	if (pd->ref_cnt)
@@ -1278,7 +1277,7 @@ int mdp4_overlay_req_check(uint32_t id, uint32_t z_order, uint32_t mixer)
 	 */
 	//FIXME: original design has problem, therefore, prevent query out of range stage array here
 	if(z_order + MDP4_MIXER_STAGE0 >= MDP4_MAX_STAGE) {
-		printk(KERN_ERR "%s(%d) zorder=%d out of stage arry range\n", __func__, __LINE__, z_order);
+		PR_DISP_ERR("%s(%d) zorder=%d out of stage arry range\n", __func__, __LINE__, z_order);
 		return -EPERM;
 	}
 
@@ -1306,45 +1305,45 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	int ret, ptype;
 
 	if (mixer >= MDP4_MAX_MIXER) {
-		printk(KERN_ERR "mpd_overlay_req2pipe: mixer out of range!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: mixer out of range!\n");
 		return -ERANGE;
 	}
 
 	if (req->z_order < 0 || req->z_order > 2) {
-		printk(KERN_ERR "mpd_overlay_req2pipe: z_order=%d out of range!\n",
+		PR_DISP_ERR("mpd_overlay_req2pipe: z_order=%d out of range!\n",
 				req->z_order);
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h == 0 || req->src_rect.w == 0) {
-		printk(KERN_ERR "mpd_overlay_req2pipe: src img of zero size!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: src img of zero size!\n");
 		return -EINVAL;
 	}
 
 
 	if (req->dst_rect.h > (req->src_rect.h * 8)) {	/* too much */
-		printk(KERN_ERR "mpd_overlay_req2pipe: too much (h)!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: too much (h)!\n");
 		return -ERANGE;
 	}
 
 	if (req->src_rect.h > (req->dst_rect.h * 8)) {	/* too little */
-		printk(KERN_ERR "mpd_overlay_req2pipe: too little (h)!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: too little (h)!\n");
 		return -ERANGE;
 	}
 
 	if (req->dst_rect.w > (req->src_rect.w * 8)) {	/* too much */
-		printk(KERN_ERR "mpd_overlay_req2pipe: too much (w)!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: too much (w)!\n");
 		return -ERANGE;
 	}
 
 	if (req->src_rect.w > (req->dst_rect.w * 8)) {	/* too little */
-		printk(KERN_ERR "mpd_overlay_req2pipe: too little (w)!\n");
+		PR_DISP_ERR("mpd_overlay_req2pipe: too little (w)!\n");
 		return -ERANGE;
 	}
 
 	//Current mdp only support the maximum 1/4 downscaling
 	if(req->src_rect.w > req->dst_rect.w * 4 || req->src_rect.h > req->dst_rect.h * 4) {
-		printk(KERN_ERR "mdp_overlay_req2pipe: Don't support this kind of downscalig srcw=%d srch=%d dstw=%d dsth=%d\n",
+		PR_DISP_ERR("mdp_overlay_req2pipe: Don't support this kind of downscalig srcw=%d srch=%d dstw=%d dsth=%d\n",
 		req->src_rect.w, req->src_rect.h, req->dst_rect.w, req->dst_rect.h);
 		return -EINVAL;
 	}
@@ -1365,7 +1364,7 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	if (pipe->pipe_num <= OVERLAY_PIPE_RGB2) {
 		if ((req->src_rect.h > req->dst_rect.h) ||
 			(req->src_rect.w > req->dst_rect.w)) {
-				printk(KERN_ERR "mpd_overlay_req2pipe: h>h || w>w!\n");
+				PR_DISP_ERR("mpd_overlay_req2pipe: h>h || w>w!\n");
 				return -ERANGE;
 		}
 	}
@@ -1387,7 +1386,7 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 		pd->ref_cnt++;
 		pipe->pipe_used++;
 		pipe->mixer_num = mixer;
-		printk(KERN_INFO "mpd4_overlay_req2pipe: zorder=%d pipe_num=%d\n",
+		PR_DISP_INFO("mpd4_overlay_req2pipe: zorder=%d pipe_num=%d\n",
 				req->z_order, pipe->pipe_num);
 	}
 
@@ -1431,10 +1430,11 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	return 0;
 }
 
+
 static int get_img(struct msmfb_data *img, struct fb_info *info,
 	unsigned long *start, unsigned long *len, struct file **pp_file)
 {
-	int put_needed, ret = 0;
+	int put_needed, ret = 0, fb_num;
 	struct file *file;
 #ifdef CONFIG_ANDROID_PMEM
 	unsigned long vstart;
@@ -1449,13 +1449,15 @@ static int get_img(struct msmfb_data *img, struct fb_info *info,
 		return -1;
 
 	if (MAJOR(file->f_dentry->d_inode->i_rdev) == FB_MAJOR) {
-		*start = info->fix.smem_start;
-		*len = info->fix.smem_len;
-		*pp_file = file;
-	} else {
+		fb_num = MINOR(file->f_dentry->d_inode->i_rdev);
+		if (get_fb_phys_info(start, len, fb_num))
+			ret = -1;
+		else
+			*pp_file = file;
+	} else
 		ret = -1;
+	if (ret)
 		fput_light(file, put_needed);
-	}
 	return ret;
 }
 #ifdef CONFIG_FB_MSM_WRITE_BACK
@@ -1481,7 +1483,7 @@ int mdp4_overlay_blt(struct mdp_device *mdp_dev,struct fb_info *info, struct msm
 		else
 			mdp4_mddi_overlay_blt(0); /* disable */
 
-		printk(KERN_INFO "mdp4_overlay_blt: END\n");
+		PR_DISP_INFO("mdp4_overlay_blt: END\n");
 	}
 
 	return 0;
@@ -1497,7 +1499,7 @@ int mdp4_overlay_change_z_order_vg_pipes(struct fb_info *info)
 
 	if(ctrl->stage[pipeS1->mixer_num][pipeS1->mixer_stage] == NULL ||
 		ctrl->stage[pipeS2->mixer_num][pipeS2->mixer_stage] == NULL) {
-		printk(KERN_ERR "mdp4_overlay_change_z_order_vg_pipes: less than two VG pipes are active \n");
+		PR_DISP_ERR("mdp4_overlay_change_z_order_vg_pipes: less than two VG pipes are active \n");
 		z_order_change = 0;
 		return -ENODEV;
 	} else {
@@ -1519,7 +1521,7 @@ static int mdp4_overlay_change_z_order_vg_pipes_actual(struct mdp4_overlay_pipe 
 	z_order_change = 0;
 	if(ctrl->stage[pipeS1->mixer_num][pipeS1->mixer_stage] == NULL ||
 		ctrl->stage[pipeS2->mixer_num][pipeS2->mixer_stage] == NULL) {
-		printk(KERN_ERR "mdp4_overlay_change_z_order_vg_pipes: less than two VG pipes are active \n");
+		PR_DISP_ERR("mdp4_overlay_change_z_order_vg_pipes: less than two VG pipes are active \n");
 		mdp4_mixer_stage_up(pipe);
 		return -ENODEV;
 	}
@@ -1531,17 +1533,17 @@ static int mdp4_overlay_change_z_order_vg_pipes_actual(struct mdp4_overlay_pipe 
 	pipeS1->req_data.z_order = pipeS1->mixer_stage - MDP4_MIXER_STAGE0;
 	pipeS2->req_data.z_order = pipeS2->mixer_stage - MDP4_MIXER_STAGE0;
 
-	printk(KERN_INFO "mdp4_overlay_change_z_order_vg_pipes\n");
+	PR_DISP_INFO("mdp4_overlay_change_z_order_vg_pipes\n");
 	data = mdp_readl(pipeS1->mdp, 0x10100);
-	printk(KERN_INFO "mdp4_overlay_change_z_order_vg_pipes data = 0x%x\n", data);
+	PR_DISP_INFO("mdp4_overlay_change_z_order_vg_pipes data = 0x%x\n", data);
 	pipe1 = (data & 0xf) << 4;
-	printk(KERN_INFO "mdp4_overlay_change_z_order_vg_pipes pipe1 = 0x%x\n",pipe1);
+	PR_DISP_INFO("mdp4_overlay_change_z_order_vg_pipes pipe1 = 0x%x\n",pipe1);
 	pipe2 = (data & 0xf0) >> 4;
-	printk(KERN_INFO "mdp4_overlay_change_z_order_vg_pipes pipe2 = 0x%x\n", pipe2);
+	PR_DISP_INFO("mdp4_overlay_change_z_order_vg_pipes pipe2 = 0x%x\n", pipe2);
 	data &= 0xffffff00;
 	data |= pipe1;
 	data |= pipe2;
-	printk(KERN_INFO "mdp4_overlay_change_z_order_vg_pipes data = 0x%x\n", data);
+	PR_DISP_INFO("mdp4_overlay_change_z_order_vg_pipes data = 0x%x\n", data);
 	mdp_writel(pipeS1->mdp, data, 0x10100);
 	return 0;
  }
@@ -1754,7 +1756,7 @@ int mdp4_overlay_play(struct mdp_device *mdp_dev, struct fb_info *info, struct m
 	img = &req->data;
 	get_img(img, info, &start, &len, &p_src_file);
 	if (len == 0) {
-		printk(KERN_ERR "mdp_overlay_play: could not retrieve"
+		PR_DISP_ERR("mdp_overlay_play: could not retrieve"
 				       " image from memory\n");
 		return -1;
 	}

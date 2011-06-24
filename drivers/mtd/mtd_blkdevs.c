@@ -376,9 +376,6 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 
 	tr->blkshift = ffs(tr->blksize) - 1;
 
-	tr->blkcore_priv->rq->backing_dev_info.ra_pages =
-		(4 * 1024) / PAGE_CACHE_SIZE;
-
 	tr->blkcore_priv->thread = kthread_run(mtd_blktrans_thread, tr,
 			"%sd", tr->name);
 	if (IS_ERR(tr->blkcore_priv->thread)) {

@@ -103,14 +103,14 @@ extern uint dhd_wapi_enabled;
 #define WL_IW_USE_ISCAN  1
 #define ENABLE_ACTIVE_PASSIVE_SCAN_SUPPRESS  1
 
-//#if defined(CONFIG_BCM4329_SOFTAP)
+#if defined(CONFIG_BCM4329_SOFTAP)
 #define WL_SOFTAP(x) myprintf x
-#define WL_SOFTAP_ERROR(x) myerrprintf x
+#define WL_SOFTAP_ERROR(x) mywrnprintf x
 static bool ap_cfg_running = FALSE;
 static bool ap_fw_loaded = FALSE;
 static int ap_mode = 0;
 static struct mac_list_set mac_list_buf;
-//#endif
+#endif
 
 #ifdef SOFTAP_PROTECT
 #define AP_PROTECT_TIME 		5000
@@ -946,6 +946,8 @@ wl_iw_set_country(
 	char *p = extra;
 	int country_offset;
 	int country_code_size;
+	channel_info_t ci;
+	int retry = 0;
 
 	WL_TRACE(("%s\n", __FUNCTION__));
 	memset(country_code, 0, sizeof(country_code));
@@ -958,6 +960,21 @@ wl_iw_set_country(
 		strncpy(country_code, extra + country_offset +1,
 			MIN(country_code_size, sizeof(country_code)));
 
+		WL_TRACE(("%s: Try to set country %s\n", __FUNCTION__, country_code));
+get_channel_retry:
+		if ((error = dev_wlc_ioctl(dev, WLC_GET_CHANNEL, &ci, sizeof(ci)))) {
+			WL_ERROR(("%s: get channel fail!\n", __FUNCTION__));
+			goto exit;
+		}
+		ci.scan_channel = dtoh32(ci.scan_channel);
+		if (ci.scan_channel) {
+			retry++;
+			WL_ERROR(("%s: scan in progress, retry %d!\n", __FUNCTION__, retry));
+			if (retry > 3)
+				goto exit;
+			bcm_mdelay(1000);
+			goto get_channel_retry;
+		}
 
 		if ((error = dev_wlc_ioctl(dev, WLC_SET_COUNTRY,
 			&country_code, sizeof(country_code))) >= 0) {
@@ -1890,23 +1907,22 @@ wl_iw_control_wl_on(
 	int ret = 0;
 
 	WL_TRACE(("Enter %s \n", __FUNCTION__));
+	if (g_onoff == G_WLAN_SET_OFF) {
+		ret = wl_control_wl_start(dev);
 
-	ret = wl_control_wl_start(dev);
-
-	wl_iw_send_priv_event(dev, "START");
 
 #ifdef CONFIG_BCM4329_SOFTAP
-	if (!ap_fw_loaded) {
+		if (!ap_fw_loaded) {
+			last_scan_time = 0;
+			wl_iw_iscan_set_scan_broadcast_prep(dev, 0);
+		}
+#else
 		last_scan_time = 0;
 		wl_iw_iscan_set_scan_broadcast_prep(dev, 0);
-	}
-#else
-	last_scan_time = 0;
-	wl_iw_iscan_set_scan_broadcast_prep(dev, 0);
 #endif
-
+	}
 	net_os_wake_lock_timeout_enable(dev);
-
+	wl_iw_send_priv_event(dev, "START");
 	WL_TRACE(("Exited %s \n", __FUNCTION__));
 
 	return ret;
@@ -2818,6 +2834,46 @@ wl_iw_mlme(
 	return error;
 }
 #endif
+
+void wl_iw_force_deauth(void)
+{
+    if(FALSE == ap_cfg_running)
+    {
+	int error  = -EINVAL;
+        scb_val_t scbval;
+        uint32 reason_code = 3;
+        struct sockaddr wapaddr;
+        uint8 cnt = 0;
+	uint8 maclen;
+        wapaddr.sa_family = ARPHRD_ETHER;
+        memset(&wapaddr.sa_data, 0, ETHER_ADDR_LEN);
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
+        rtnl_lock();
+#endif
+	(void) dev_wlc_ioctl(priv_dev, WLC_GET_BSSID, &wapaddr.sa_data, ETHER_ADDR_LEN);
+     
+        for(maclen = 0; maclen < ETHER_ADDR_LEN; maclen++)
+	    cnt = wapaddr.sa_data[maclen];
+      if(cnt)
+      {
+           scbval.val = reason_code;
+           bcopy(&wapaddr.sa_data, &scbval.ea, ETHER_ADDR_LEN);
+           scbval.val = htod32(scbval.val);
+           error = dev_wlc_ioctl(priv_dev, WLC_SCB_DEAUTHENTICATE_FOR_REASON, &scbval, sizeof(scb_val_t));
+           WL_TRACE(("%s Send WLC_SCB_DEAUTHENTICATE.\n",__FUNCTION__));
+      }
+      else
+      {
+           WL_TRACE(("%s Skip send WLC_SCB_DEAUTHENTICATE.\n",__FUNCTION__));
+      }
+
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 27))
+        rtnl_unlock();
+#endif
+    }
+
+}
 
 static int
 wl_iw_get_aplist(
@@ -4713,10 +4769,6 @@ wl_iw_iscan_get_scan(
   }
 	WL_DEFAULT(("%s return to WE %d bytes APs=%d\n", __func__, dwrq->length, counter));
 
-	if (!dwrq->length) {
-		WL_DEFAULT(("%s: EAGAIN!\n", __FUNCTION__));
-		return -EAGAIN;
-	}
 	return 0;
 }
 #endif
@@ -6446,6 +6498,11 @@ wl_iw_set_cscan(
 		__FUNCTION__, info->cmd, info->flags,
 		wrqu->data.pointer, wrqu->data.length));
 
+	if(!wifi_get_cscan_enable()){
+		WL_DEFAULT(("%s: CSCAN do not enabe\n", __FUNCTION__));
+		return 0;
+	}
+  	
 	if (g_onoff == G_WLAN_SET_OFF) {
 		WL_TRACE(("%s: driver is not up yet after START\n", __FUNCTION__));
 		return -1;
@@ -6489,7 +6546,6 @@ wl_iw_set_cscan(
 		else {
 
 			memset(iscan->iscan_ex_params_p, 0, iscan->iscan_ex_param_size);
-
 
 			wl_iw_iscan_prep(&iscan->iscan_ex_params_p->params, NULL);
 			iscan->iscan_ex_params_p->version = htod32(ISCAN_REQ_VERSION);
@@ -7542,6 +7598,93 @@ get_assoc_sta_list(struct net_device *dev, char *buf, int len)
 	return 0;
 }
 
+static vndr_ie_setbuf_t *ie_setbuf = NULL ;
+static int
+wl_iw_create_wps_ie(char *buf, int ie_len)
+{
+	unsigned int pktflag = VNDR_IE_PRBREQ_FLAG;
+	int iecount;
+
+	if(!ie_setbuf)
+		ie_setbuf = (vndr_ie_setbuf_t *) kmalloc(VNDR_IE_MAX_LEN + sizeof(vndr_ie_setbuf_t), GFP_KERNEL);
+
+	if(!ie_setbuf) {
+		WL_ERROR(("memory alloc failure\n"));
+		return -1;
+	}
+
+	iecount = 1;
+	memcpy(&ie_setbuf->vndr_ie_buffer.iecount, &iecount, sizeof(int));
+
+	/*
+	* The packet flag bit field indicates the packets that will
+	* contain this IE
+	*/
+	memcpy(&ie_setbuf->vndr_ie_buffer.vndr_ie_list[0].pktflag, &pktflag, sizeof(uint32));
+
+	memcpy(&(ie_setbuf->vndr_ie_buffer.vndr_ie_list[0].vndr_ie_data.len), buf, ie_len);
+
+	return 0;
+}
+
+static void
+wl_iw_add_wps_ie(struct net_device *dev)
+{
+	int buflen;
+	strcpy (ie_setbuf->cmd, "add");
+
+	buflen = ie_setbuf->vndr_ie_buffer.vndr_ie_list[0].vndr_ie_data.len -
+		VNDR_IE_MIN_LEN + sizeof(vndr_ie_setbuf_t) ;
+
+	dev_wlc_bufvar_set(dev, "vndr_ie", (char *)ie_setbuf, buflen);
+
+	return;
+}
+
+static void
+wl_iw_del_wps_ie(struct net_device *dev)
+{
+	int buflen;
+	if (!ie_setbuf)
+		return;
+	/* Copy the vndr_ie SET command ("add"/"del") to the buffer */
+	strcpy (ie_setbuf->cmd, "del");
+
+	buflen = ie_setbuf->vndr_ie_buffer.vndr_ie_list[0].vndr_ie_data.len -
+	        VNDR_IE_MIN_LEN + sizeof(vndr_ie_setbuf_t) ;
+
+	dev_wlc_bufvar_set(dev, "vndr_ie", (char *)ie_setbuf, buflen);
+
+	kfree(ie_setbuf);
+	ie_setbuf = NULL;
+
+	return;
+}
+
+static int
+wl_iw_set_probe_request_ie(struct net_device *dev, char *buf, int ie_len)
+{
+	WL_TRACE(("get ie len = %d\n", ie_len));
+
+#if 0
+	for (i = 0; i < ie_len; i++) {
+		WL_TRACE((" %02X", *(buf+i)));
+	}
+
+	WL_ERROR(("\n"));
+#endif
+
+	wl_iw_del_wps_ie(dev);
+
+	if (ie_is_wps_ie((uint8 **)(&buf), (uint8 **)(&buf), &ie_len)) {
+		WL_TRACE(("wps_ie found\n"));
+
+		if (wl_iw_create_wps_ie(buf+1, ie_len-1) != 0)
+			return -1;
+		wl_iw_add_wps_ie(dev);
+	}
+	return 0;
+}
 
 static int
 set_ap_mac_list(struct net_device *dev, char *buf)
@@ -7869,6 +8012,10 @@ static int wl_iw_set_priv(
 		else if (strnicmp(extra, "SCAN_MINRSSI", strlen("SCAN_MINRSSI")) == 0) {
 			wl_iw_scan_minrssi(dev, info, (union iwreq_data *)dwrq, extra);
 		}
+                else if (strnicmp(extra, "SET_PRB_REQ", strlen("SET_PRB_REQ")) == 0) {
+			WL_TRACE(("SET_PRB_REQ\n"));
+			wl_iw_set_probe_request_ie(dev, (extra + PROFILE_OFFSET), dwrq->length-PROFILE_OFFSET);
+                }
 	    else {
 			snprintf(extra, MAX_WX_STRING, "OK");
 			dwrq->length = strlen("OK") + 1;

@@ -23,7 +23,7 @@
 #include "sdio_cis.h"
 #include "sdio_ops.h"
 
-#ifdef CONFIG_MMC_MSM7X00A
+#if defined(CONFIG_MMC_MSM7X00A) || defined(CONFIG_MMC_MSM)
 #include <mach/msm_sdcc.h>
 #endif
 
@@ -247,7 +247,7 @@ static int sdio_read_cis(struct mmc_card *card, struct sdio_func *func)
 
 		/* null entries have no link field or data */
 		if (tpl_code == 0x00) {
-#ifdef CONFIG_MMC_MSM7X00A
+#if defined(CONFIG_MMC_MSM7X00A) || defined(CONFIG_MMC_MSM)
 			if (is_svlte_type_mmc_card(card))
 				break;
 			else

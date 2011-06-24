@@ -246,47 +246,47 @@ static ssize_t store_serial_lock_cpu(struct device *dev,
 	if (msm_uport->cpu_lock_supported) {
 		if (2 == serial_lock_cpu_state) {	/* lock cpu high */
 			if (msm_uport->is_cpu_lock & LOCKHIGH)
-				printk(KERN_INFO "Lock H, but H before\n");
+				printk(KERN_INFO "[BT]Lock H, but H before\n");
 			else if (msm_uport->is_cpu_lock & LOCKLOW) {
-				printk(KERN_INFO "Lock L, but L before\n");
+				printk(KERN_INFO "[BT]Lock L, but L before\n");
 				perf_unlock(&msm_uport->serial_perf_lock_low);
 				msm_uport->is_cpu_lock &= !LOCKLOW;
 				msm_uport->is_cpu_lock |= LOCKHIGH;
 				perf_lock(&msm_uport->serial_perf_lock_high);
-				printk(KERN_INFO "UnLock L, Lock H\n");
+				printk(KERN_INFO "[BT]UnLock L, Lock H\n");
 			} else{
 				msm_uport->is_cpu_lock |= LOCKHIGH;
 				perf_lock(&msm_uport->serial_perf_lock_high);
-				printk(KERN_INFO "Lock H\n");
+				printk(KERN_INFO "[BT]Lock H\n");
 			}
 		} else if (1 == serial_lock_cpu_state) { /* lock cpu low */
 			if (msm_uport->is_cpu_lock & LOCKLOW)
-				printk(KERN_INFO "Lock L, but L before \n");
+				printk(KERN_INFO "[BT]Lock L, but L before \n");
 			else if (msm_uport->is_cpu_lock & LOCKHIGH) {
-				printk(KERN_INFO "Lock H, but H before \n");
+				printk(KERN_INFO "[BT]Lock H, but H before \n");
 				perf_unlock(&msm_uport->serial_perf_lock_high);
 				msm_uport->is_cpu_lock &= !LOCKHIGH;
 				msm_uport->is_cpu_lock |= LOCKLOW;
 				perf_lock(&msm_uport->serial_perf_lock_low);
-				printk(KERN_INFO "UnLock H, Lock L\n");
+				printk(KERN_INFO "[BT]UnLock H, Lock L\n");
 			} else{
 				msm_uport->is_cpu_lock |= LOCKLOW;
 				perf_lock(&msm_uport->serial_perf_lock_low);
-				printk(KERN_INFO "Lock L\n");
+				printk(KERN_INFO "[BT]Lock L\n");
 			}
 		} else {	/* unlock cpu */
 			if (!msm_uport->is_cpu_lock)
-				printk(KERN_INFO "#UnLock all,UnLock before\n");
+				printk(KERN_INFO "[BT]#UnLock all,UnLock before\n");
 			else {
 				if (msm_uport->is_cpu_lock & LOCKHIGH) {
 				perf_unlock(&msm_uport->serial_perf_lock_high);
 					msm_uport->is_cpu_lock &= !LOCKHIGH;
-					printk(KERN_INFO "#UnLock H\n");
+					printk(KERN_INFO "[BT]#UnLock H\n");
 				}
 				if (msm_uport->is_cpu_lock & LOCKLOW) {
 				perf_unlock(&msm_uport->serial_perf_lock_low);
 					msm_uport->is_cpu_lock &= !LOCKLOW;
-					printk(KERN_INFO "#UnLock L\n");
+					printk(KERN_INFO "[BT]#UnLock L\n");
 				}
 			}
 
@@ -331,7 +331,7 @@ static int __devexit msm_hs_remove(struct platform_device *pdev)
 	struct device *dev;
 
 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
-		printk(KERN_ERR "Invalid plaform device ID = %d\n", pdev->id);
+		printk(KERN_ERR "[BT]Invalid plaform device ID = %d\n", pdev->id);
 		return -EINVAL;
 	}
 
@@ -378,14 +378,14 @@ static int msm_hs_init_clk_locked(struct uart_port *uport)
 	wake_lock(&msm_uport->dma_wake_lock);
 	ret = clk_enable(msm_uport->clk);
 	if (ret) {
-		printk(KERN_ERR "Error could not turn on UART clk\n");
+		printk(KERN_ERR "[BT]Error could not turn on UART clk\n");
 		return ret;
 	}
 
 	/* Set up the MREG/NREG/DREG/MNDREG */
 	ret = clk_set_rate(msm_uport->clk, uport->uartclk);
 	if (ret) {
-		printk(KERN_WARNING "Error setting clock rate on UART\n");
+		printk(KERN_WARNING "[BT]Error setting clock rate on UART\n");
 		return ret;
 	}
 
@@ -410,7 +410,7 @@ static void msm_hs_pm(struct uart_port *uport, unsigned int state,
 		clk_disable(msm_uport->clk);
 		break;
 	default:
-		printk(KERN_ERR "msm_serial: Unknown PM state %d\n", state);
+		printk(KERN_ERR "[BT]msm_serial: Unknown PM state %d\n", state);
 	}
 }
 
@@ -517,7 +517,7 @@ static void msm_hs_set_bps_locked(struct uart_port *uport,
 		uport->uartclk = 7372800;
 
 	if (clk_set_rate(msm_uport->clk, uport->uartclk)) {
-		printk(KERN_WARNING "Error setting clock rate on UART\n");
+		printk(KERN_WARNING "[BT]Error setting clock rate on UART\n");
 		return;
 	}
 
@@ -1491,10 +1491,10 @@ static int msm_hs_probe(struct platform_device *pdev)
 	struct msm_serial_hs_platform_data *pdata = pdev->dev.platform_data;
 
 	/* for debug */
-	printk(KERN_INFO "TI chip\n");
+	printk(KERN_INFO "[BT]TI chip\n");
 
 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
-		printk(KERN_ERR "Invalid plaform device ID = %d\n", pdev->id);
+		printk(KERN_ERR "[BT]Invalid plaform device ID = %d\n", pdev->id);
 		return -EINVAL;
 	}
 
@@ -1552,7 +1552,7 @@ static int msm_hs_probe(struct platform_device *pdev)
 			result = sysfs_create_group(&pdev->dev.kobj,
 					&serial_hs_attribute_group);
 			if (result)
-				printk(KERN_ERR "%s reg attr fail!!",
+				printk(KERN_ERR "[BT]%s reg attr fail!!",
 						__func__);
 
 			SERIAL_HS_SET_DEVICE_ATTR(serial_lock_cpu,
@@ -1619,17 +1619,17 @@ static int __init msm_serial_hs_init(void)
 
 	ret = uart_register_driver(&msm_hs_driver);
 	if (unlikely(ret)) {
-		printk(KERN_ERR "%s failed to load\n", __func__);
+		printk(KERN_ERR "[BT]%s failed to load\n", __func__);
 		return ret;
 	}
 	ret = platform_driver_register(&msm_serial_hs_platform_driver);
 	if (ret) {
-		printk(KERN_ERR "%s failed to load\n", __func__);
+		printk(KERN_ERR "[BT]%s failed to load\n", __func__);
 		uart_unregister_driver(&msm_hs_driver);
 		return ret;
 	}
 
-	printk(KERN_INFO "msm_serial_hs module loaded\n");
+	printk(KERN_INFO "[BT]msm_serial_hs module loaded\n");
 	return ret;
 }
 
@@ -1686,7 +1686,7 @@ static void msm_hs_shutdown(struct uart_port *uport)
 
 static void __exit msm_serial_hs_exit(void)
 {
-	printk(KERN_INFO "msm_serial_hs module removed\n");
+	printk(KERN_INFO "[BT]msm_serial_hs module removed\n");
 	platform_driver_unregister(&msm_serial_hs_platform_driver);
 	uart_unregister_driver(&msm_hs_driver);
 }

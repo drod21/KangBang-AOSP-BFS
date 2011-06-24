@@ -1,7 +1,7 @@
 /* arch/arm/mach-msm/clock.h
  *
  * Copyright (C) 2007 Google, Inc.
- * Copyright (c) 2007 QUALCOMM Incorporated
+ * Copyright (c) 2007-2010, Code Aurora Forum. All rights reserved.
  *
  * This software is licensed under the terms of the GNU General Public
  * License version 2, as published by the Free Software Foundation, and
@@ -17,6 +17,9 @@
 #ifndef __ARCH_ARM_MACH_MSM_CLOCK_H
 #define __ARCH_ARM_MACH_MSM_CLOCK_H
 
+#if defined (CONFIG_ARCH_MSM8X60)
+#include <linux/init.h>
+#endif
 #include <linux/list.h>
 #include <mach/clk.h>
 #include <linux/timer.h>
@@ -25,8 +28,10 @@
 #include "clock-7x30.h"
 #endif
 
+/* Maximum number of clocks supported. */
+#define MAX_NR_CLKS	300
+
 #define CLKFLAG_USE_MAX_TO_SET		(0x00000001)
-#define CLKFLAG_AUTO_OFF		(0x00000002)
 #define CLKFLAG_USE_MIN_TO_SET		(0x00000004)
 #define CLKFLAG_SHARED			(0x00000008)
 #define CLKFLAG_HANDLE			(0x00000010)
@@ -35,6 +40,21 @@
 #define CLKFLAG_ARCH_MSM7X00A		(0x00010000)
 #define CLKFLAG_ARCH_QSD8X50		(0x00020000)
 #define CLKFLAG_ARCH_ALL		(0xffff0000)
+
+#define CLKFLAG_INVERT			0x00000001
+#define CLKFLAG_NOINVERT		0x00000002
+#define CLKFLAG_NONEST			0x00000004
+#define CLKFLAG_NORESET			0x00000008
+#define CLKFLAG_VOTER			0x00000010
+
+#define CLK_FIRST_AVAILABLE_FLAG	0x00000100
+#if defined (CONFIG_ARCH_MSM8X60)
+#define CLKFLAG_AUTO_OFF		0x00000200
+#else
+#define CLKFLAG_AUTO_OFF		(0x00000002)
+#endif
+#define CLKFLAG_MIN			0x00000400
+#define CLKFLAG_MAX			0x00000800
 
 struct clk_ops {
 	int (*enable)(unsigned id);
@@ -46,8 +66,11 @@ struct clk_ops {
 	int (*set_max_rate)(unsigned id, unsigned rate);
 	int (*set_flags)(unsigned id, unsigned flags);
 	unsigned (*get_rate)(unsigned id);
+	int (*list_rate)(unsigned id, unsigned n);
+	int (*measure_rate)(unsigned id);
 	unsigned (*is_enabled)(unsigned id);
 	long (*round_rate)(unsigned id, unsigned rate);
+	int (*set_parent)(unsigned id, struct clk *parent);
 };
 
 struct clk {
@@ -57,8 +80,15 @@ struct clk {
 	uint32_t flags;
 	const char *name;
 	struct clk_ops *ops;
+	const char *dbg_name;
+#if defined (CONFIG_ARCH_MSM8X60)
+	struct list_head list;
+#else
 	struct hlist_node list;
+#endif
 	struct device *dev;
+	struct hlist_head voters;
+	const char *aggregator;
 	struct hlist_head handles;
 	struct timer_list defer_clk_timer;
 };
@@ -183,12 +213,19 @@ struct clk_handle {
 #define GSBI_PCLK		99
 #define NR_CLKS			100
 
+#define OFF CLKFLAG_AUTO_OFF
+#define CLK_MIN CLKFLAG_MIN
+#define CLK_MAX CLKFLAG_MAX
+#define CLK_MINMAX (CLK_MIN | CLK_MAX)
+
+#ifndef CONFIG_ARCH_MSM8X60
 extern struct clk msm_clocks[];
+#endif
 
 void clk_enter_sleep(int from_idle);
 void clk_exit_sleep(void);
 
-#if defined (CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_MSM7X30)
 enum {
 	PLL_0 = 0,
 	PLL_1,
@@ -200,14 +237,39 @@ enum {
 	NUM_PLL
 };
 
+unsigned long clk_get_max_axi_khz(void);
+#endif
+
 enum clkvote_client {
 	CLKVOTE_ACPUCLK = 0,
 	CLKVOTE_PMQOS,
 	CLKVOTE_MAX,
 };
 
-unsigned long clk_get_max_axi_khz(void);
+#if defined (CONFIG_ARCH_MSM8X60)
+#ifdef CONFIG_DEBUG_FS
+int __init clock_debug_init(void);
+int __init clock_debug_add(struct clk *clock);
+#else
+static inline int __init clock_debug_init(void) { return 0; }
+static inline int __init clock_debug_add(struct clk *clock) { return 0; }
 #endif
+#endif
+
+extern struct clk_ops clk_ops_remote;
+
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
+void msm_clk_soc_init(void);
+void msm_clk_soc_set_ops(struct clk *clk);
+#else
+static inline void msm_clk_soc_init(void) { }
+static inline void msm_clk_soc_set_ops(struct clk *clk) { }
+#endif
+
+int msm_clock_require_tcxo(unsigned long *reason, int nbits);
+int msm_clock_get_name(uint32_t id, char *name, uint32_t size);
+int ebi1_clk_set_min_rate(enum clkvote_client client, unsigned long rate);
+unsigned long clk_get_max_axi_khz(void);
 
 #endif
 

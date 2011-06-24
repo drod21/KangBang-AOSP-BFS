@@ -29,7 +29,7 @@ endif
 ifeq ($(CONFIG_ARCH_MSM7227),y)
   zreladdr-y              := 0x12C08000
 params_phys-y           := 0x12C00100
-initrd_phys-y           := 0x13400000
+initrd_phys-y           := 0x13C00000
 endif
 
 ifeq ($(CONFIG_ARCH_MSM7X00A),y)
@@ -62,9 +62,15 @@ ifeq ($(CONFIG_MACH_ICON),y)
 params_phys-y           := 0x04400100
 initrd_phys-y           := 0x05400000
 else
+ifeq ($(CONFIG_MACH_EXPRESS_KT),y)
+  zreladdr-y            := 0x04408000
+params_phys-y           := 0x04400100
+initrd_phys-y           := 0x05400000
+else
   zreladdr-y            := 0x04008000
 params_phys-y           := 0x04000100
 initrd_phys-y           := 0x05000000
+endif
 endif
 endif
 endif
@@ -92,6 +98,11 @@ ifeq ($(CONFIG_MACH_EXPRESS),y)
 params_phys-y           := 0x05000100
 initrd_phys-y           := 0x06000000
 else
+ifeq ($(CONFIG_MACH_KINGDOM),y)
+  zreladdr-y            := 0x05008000
+params_phys-y           := 0x05000100
+initrd_phys-y           := 0x06000000
+else
   zreladdr-y            := 0x04A08000
 params_phys-y           := 0x04A00100
 initrd_phys-y           := 0x05A00000
@@ -99,4 +110,11 @@ endif
 endif
 endif
 endif
+endif
+endif
+
+ifeq ($(CONFIG_ARCH_MSM8X60),y)
+zreladdr-y             := 0x40408000
+params_phys-y            := 0x40400100
+initrd_phys-y            := 0x41400000
 endif

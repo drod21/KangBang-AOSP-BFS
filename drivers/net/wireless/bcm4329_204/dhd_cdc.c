@@ -824,7 +824,7 @@ int dhd_set_keepalive(int value)
     wl_keep_alive_pkt_t *keep_alive_pktp;
     char mac_buf[16];
     dhd_pub_t *dhd = pdhd;
-
+    char packetstr[128];
 #ifdef HTC_KlocWork
 	memset(&keep_alive_pkt, 0, sizeof(keep_alive_pkt));
 #endif
@@ -839,31 +839,31 @@ int dhd_set_keepalive(int value)
     
     if (value == 0) {
     	keep_alive_pkt.period_msec = htod32(60000); // Default 60s NULL keepalive packet
-    	str = "0x6e756c6c207061636b657400";
+	strncpy(packetstr, "0x6e756c6c207061636b657400", 26);
+	packetstr[26] = '\0';
      } else {
     	keep_alive_pkt.period_msec = htod32(15000); // 15s
     
 	    /* temp packet content */
-	    str = "0xFFFFFFFFFFFF00112233445508060001080006040002002376cf51880a090a09FFFFFFFFFFFFFFFFFFFF";
-	    
+	    strncpy(packetstr, "0xFFFFFFFFFFFF00112233445508060001080006040002002376cf51880a090a09FFFFFFFFFFFFFFFFFFFF", 86);
 	    /* put mac address in */
 	    sprintf( mac_buf, "%02x%02x%02x%02x%02x%02x",
 	    dhd->mac.octet[0], dhd->mac.octet[1], dhd->mac.octet[2],
 	    dhd->mac.octet[3], dhd->mac.octet[4], dhd->mac.octet[5]
 	    );
 	    /* put MAC address in */
-	    memcpy( str+14, mac_buf, ETHER_ADDR_LEN*2);
-	    memcpy( str+46, mac_buf, ETHER_ADDR_LEN*2);
+	    memcpy( packetstr+14, mac_buf, ETHER_ADDR_LEN*2);
+	    memcpy( packetstr+46, mac_buf, ETHER_ADDR_LEN*2);
 	    /* put IP address in */
-	    memcpy( str+58, ip_str, 8);
+	    memcpy( packetstr+58, ip_str, 8);
     
 	    /* put Default gateway in */
-	    memcpy( str+78, gatewaybuf, 8);
-	      
-	    DHD_DEFAULT(("%s:Default gateway:%s\n", __FUNCTION__, str));
+	    memcpy( packetstr+78, gatewaybuf, 8);
+	    packetstr[86] = '\0';
+	    DHD_DEFAULT(("%s:Default gateway:%s\n", __FUNCTION__, packetstr));
 	}
     
-    keep_alive_pkt.len_bytes = htod16(wl_pattern_atoh(str, (char*)keep_alive_pktp->data));
+    keep_alive_pkt.len_bytes = htod16(wl_pattern_atoh(packetstr, (char*)keep_alive_pktp->data));
     
     buf_len += (WL_KEEP_ALIVE_FIXED_LEN + keep_alive_pkt.len_bytes);
     
@@ -1003,6 +1003,11 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 #else
 	uint roamvar = 1;
 #endif
+#if 0
+	uint wme = 1;
+	uint wme_apsd = 1;
+	uint wme_qosinfo = 0xf;
+#endif
 	uint power_mode = PM_FAST;
 	uint32 dongle_align = DHD_SDALIGN;
 	uint32 glom = 0;
@@ -1085,6 +1090,20 @@ dhd_preinit_ioctls(dhd_pub_t *dhd)
 	/* Enable/Disable build-in roaming to allowed ext supplicant to take of romaing */
 	bcm_mkiovar("roam_off", (char *)&roamvar, 4, iovbuf, sizeof(iovbuf));
 	dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+
+#if 0
+	/* Set wme to 1 */
+	bcm_mkiovar("wme", (char *)&wme, 4, iovbuf, sizeof(iovbuf));
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+
+	/* Set wme_apsd to 1 */
+	bcm_mkiovar("wme_apsd", (char *)&wme_apsd, 4, iovbuf, sizeof(iovbuf));
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+
+	/* Set wme_qosinfo to oxf */
+	bcm_mkiovar("wme_qosinfo", (char *)&wme_qosinfo, 4, iovbuf, sizeof(iovbuf));
+	dhdcdc_set_ioctl(dhd, 0, WLC_SET_VAR, iovbuf, sizeof(iovbuf));
+#endif
 
 	if(!wifi_get_dot11n_enable()) {
 		/* Disable nmode as default */

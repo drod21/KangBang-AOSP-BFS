@@ -45,7 +45,7 @@ static void invoke_rcu_kthread(void);
 /* Forward declarations for rcutiny_plugin.h. */
 struct rcu_ctrlblk;
 static void rcu_process_callbacks(struct rcu_ctrlblk *rcp);
-static int rcu_kthread(void *arg)
+static int rcu_kthread(void *arg);
 static void __call_rcu(struct rcu_head *head,
 		       void (*func)(struct rcu_head *rcu),
 		       struct rcu_ctrlblk *rcp);
@@ -117,7 +117,7 @@ void rcu_sched_qs(int cpu)
 void rcu_bh_qs(int cpu)
 {
 	if (rcu_qsctr_help(&rcu_bh_ctrlblk))
-		raise_softirq(RCU_SOFTIRQ);
+		invoke_rcu_kthread();
 }
 
 /*
@@ -164,7 +164,7 @@ static void rcu_process_callbacks(struct rcu_ctrlblk *rcp)
 	while (list) {
 		next = list->next;
 		prefetch(next);
-		//debug_rcu_head_unqueue(list);
+		debug_rcu_head_unqueue(list);
 		local_bh_disable();
 		list->func(list);
 		local_bh_enable();
@@ -318,4 +318,3 @@ static int __init rcu_spawn_kthreads(void)
 	return 0;
 }
 early_initcall(rcu_spawn_kthreads);
-

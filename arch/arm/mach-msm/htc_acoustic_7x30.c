@@ -22,6 +22,7 @@
 #include <linux/gfp.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+#include <linux/mfd/msm-adie-codec.h>
 #include <mach/qdsp5v2/snddev_icodec.h>
 #include <mach/qdsp5v2/audio_dev_ctl.h>
 #include <mach/qdsp5v2/audio_acdb.h>
@@ -52,8 +53,8 @@
 #define ACOUSTIC_GET_TABLES 	_IOW(ACOUSTIC_IOCTL_MAGIC, 33, unsigned)
 #define ACOUSTIC_ENABLE_BACK_MIC	_IOW(ACOUSTIC_IOCTL_MAGIC, 34, unsigned)
 
-#define D(fmt, args...) printk(KERN_INFO "htc-acoustic: "fmt, ##args)
-#define E(fmt, args...) printk(KERN_ERR "htc-acoustic: "fmt, ##args)
+#define D(fmt, args...) printk(KERN_INFO "[AUD] htc-acoustic: "fmt, ##args)
+#define E(fmt, args...) printk(KERN_ERR "[AUD] htc-acoustic: "fmt, ##args)
 
 #define SHARE_PAGES 4
 
@@ -118,7 +119,7 @@ static int is_rpc_connect(void)
 		endpoint = msm_rpc_connect(HTCPROG,
 				HTCVERS, 0);
 		if (IS_ERR(endpoint)) {
-			pr_err("%s: init rpc failed! rc = %ld\n",
+			pr_aud_err("%s: init rpc failed! rc = %ld\n",
 				__func__, PTR_ERR(endpoint));
 			mutex_unlock(&rpc_connect_lock);
 			return -1;
@@ -258,7 +259,8 @@ acoustic_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			rc = -EFAULT;
 			break;
 		}
-		E("update ACDB ID : (%d, %d, %d, %d)\n", 
+		pr_aud_info("%s update ACDB ID : (%d, %d, %d, %d)\n",
+			__func__,
 			cur_acdb_id.tx_dev_id,
 			cur_acdb_id.rx_dev_id,
 			cur_acdb_id.tx_acdb_id,
@@ -476,11 +478,11 @@ static ssize_t attr_store(struct device *dev, struct device_attribute *attr,
 	return 0;
 }
 
-static DEVICE_ATTR(sysattr, 0666, attr_show, attr_store);
+static DEVICE_ATTR(sysattr, 0664, attr_show, attr_store);
 
 int enable_mic_bias(int on)
 {
-	pr_info("%s called %d\n", __func__, on);
+	pr_aud_info("%s called %d\n", __func__, on);
 	if (the_ops->enable_mic_bias)
 		the_ops->enable_mic_bias(on, 1);
 
@@ -495,7 +497,7 @@ static int __init acoustic_init(void)
 	mutex_init(&rpc_connect_lock);
 	ret = misc_register(&acoustic_misc);
 	if (ret < 0) {
-		pr_err("failed to register misc device!\n");
+		pr_aud_err("failed to register misc device!\n");
 		return ret;
 	}
 

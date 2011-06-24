@@ -5,16 +5,6 @@
 obj-$(CONFIG_IPW2100) += ipw2x00/
 obj-$(CONFIG_IPW2200) += ipw2x00/
 
-obj-$(CONFIG_STRIP) += strip.o
-obj-$(CONFIG_ARLAN) += arlan.o 
-
-arlan-objs := arlan-main.o arlan-proc.o
-
-# Obsolete cards
-obj-$(CONFIG_WAVELAN)		+= wavelan.o
-obj-$(CONFIG_PCMCIA_NETWAVE)	+= netwave_cs.o
-obj-$(CONFIG_PCMCIA_WAVELAN)	+= wavelan_cs.o
-
 obj-$(CONFIG_HERMES)		+= orinoco/
 
 obj-$(CONFIG_AIRO)		+= airo.o
@@ -63,4 +53,8 @@ obj-$(CONFIG_WL12XX)	+= wl12xx/
 
 obj-$(CONFIG_IWM)	+= iwmc3200wifi/
 
-obj-$(CONFIG_BCM4329)	+= bcm4329/
+ifeq ($(CONFIG_BCM4329_PURE_ANDROID),y)
+  obj-$(CONFIG_BCM4329)	+= bcm4329/
+else
+  obj-$(CONFIG_BCM4329)	+= bcm4329_204/
+endif

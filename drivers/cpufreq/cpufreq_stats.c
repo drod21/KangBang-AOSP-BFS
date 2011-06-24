@@ -307,22 +307,23 @@ static int cpufreq_stat_notifier_trans(struct notifier_block *nb,
 
 static int cpufreq_stats_create_table_cpu(unsigned int cpu)
 {
-  struct cpufreq_policy *policy;
-  struct cpufreq_frequency_table *table;
-  int ret = -ENODEV;
-  policy = cpufreq_cpu_get(cpu);
-  if (!policy)
-    return -ENODEV;
-  
-  table = cpufreq_frequency_get_table(cpu);
-  if (!table)
-    goto out;
-  
-  ret = cpufreq_stats_create_table(policy, table);
-  
+	struct cpufreq_policy *policy;
+	struct cpufreq_frequency_table *table;
+	int ret = -ENODEV;
+
+	policy = cpufreq_cpu_get(cpu);
+	if (!policy)
+		return -ENODEV;
+
+	table = cpufreq_frequency_get_table(cpu);
+	if (!table)
+		goto out;
+
+	ret = cpufreq_stats_create_table(policy, table);
+
 out:
-    cpufreq_cpu_put(policy);
-    return ret;
+	cpufreq_cpu_put(policy);
+	return ret;
 }
 
 static int __cpuinit cpufreq_stat_cpu_callback(struct notifier_block *nfb,
@@ -342,7 +343,8 @@ static int __cpuinit cpufreq_stat_cpu_callback(struct notifier_block *nfb,
 		break;
 	case CPU_DOWN_FAILED:
 	case CPU_DOWN_FAILED_FROZEN:
-	cpufreq_stats_create_table_cpu(cpu);
+		cpufreq_stats_create_table_cpu(cpu);
+		break;
 	}
 	return NOTIFY_OK;
 }
@@ -350,7 +352,7 @@ static int __cpuinit cpufreq_stat_cpu_callback(struct notifier_block *nfb,
 static struct notifier_block cpufreq_stat_cpu_notifier __refdata =
 {
 	.notifier_call = cpufreq_stat_cpu_callback,
-	.priority = 1
+	.priority = 1,
 };
 
 static struct notifier_block notifier_policy_block = {
@@ -407,4 +409,3 @@ MODULE_LICENSE("GPL");
 
 module_init(cpufreq_stats_init);
 module_exit(cpufreq_stats_exit);
-

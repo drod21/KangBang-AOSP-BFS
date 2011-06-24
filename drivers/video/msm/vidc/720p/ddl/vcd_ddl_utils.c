@@ -93,10 +93,6 @@ void ddl_pmem_alloc(struct ddl_buf_addr *buff_addr, size_t sz, u32 align)
 		__func__, buff_addr->physical_base_addr,
 		buff_addr->virtual_base_addr, (u32)sz);
 
-	DBG("\n%s() IN : phy_addr(%p) ker_addr(%p) size(%u)",
-		__func__, buff_addr->physical_base_addr,
-		buff_addr->virtual_base_addr, (u32)sz);
-
 	if (align == DDL_LINEAR_BUFFER_ALIGN_BYTES) {
 
 		guard_bytes = 31;
@@ -178,7 +174,7 @@ void ddl_get_core_start_time(u8 codec)
 	else if (codec == 1)
 		ddl_t1 = &ddl_enc_t1;
 
-	if (!ddl_t1) {
+	if (!*ddl_t1) {
 		struct timeval ddl_tv;
 		do_gettimeofday(&ddl_tv);
 		*ddl_t1 = (ddl_tv.tv_sec * 1000) + (ddl_tv.tv_usec / 1000);
@@ -201,7 +197,7 @@ void ddl_calc_core_time(u8 codec)
 		ddl_count = &ddl_enc_count;
 	}
 
-	if (ddl_t1 && ddl_ttotal && ddl_count) {
+	if (*ddl_t1) {
 		int ddl_t2;
 		struct timeval ddl_tv;
 		do_gettimeofday(&ddl_tv);

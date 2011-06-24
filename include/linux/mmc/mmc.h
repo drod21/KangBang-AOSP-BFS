@@ -207,6 +207,7 @@ struct _mmc_csd {
  * OCR bits are mostly in host.h
  */
 #define MMC_CARD_BUSY	0x80000000	/* Card Power up status bit */
+#define MMC_CARD_SECTOR_ADDR 0x40000000 /* Card supports sectors */
 
 /*
  * Card Command Classes (CCC)
@@ -275,7 +276,7 @@ struct _mmc_csd {
 #define EXT_CSD_CARD_TYPE_26	(1<<0)	/* Card can run at 26MHz */
 #define EXT_CSD_CARD_TYPE_52	(1<<1)	/* Card can run at 52MHz */
 #define EXT_CSD_CARD_TYPE_MASK	0x3	/* Mask out reserved and DDR bits */
-#if defined(CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
 #define EXT_CSD_CARD_TYPE_DDR_HV	(1<<2)	/* Card can run at 52MHz */
 #define EXT_CSD_CARD_TYPE_DDR_LV	(1<<3)	/* Card can run at 52MHz */
 #endif

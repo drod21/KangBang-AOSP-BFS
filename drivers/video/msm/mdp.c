@@ -35,6 +35,8 @@
 #include "mdp_ppp.h"
 #include <asm/mach-types.h>
 
+#include <mach/debug_display.h>
+
 struct class *mdp_class;
 
 #define MDP_CMD_DEBUG_ACCESS_BASE (0x10000)
@@ -99,7 +101,7 @@ static int locked_enable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
 	/* if the mask bits are already set return an error, this interrupt
 	 * is already enabled */
 	if (mdp_irq_mask & mask) {
-		pr_err("mdp irq already on %x %x\n", mdp_irq_mask, mask);
+		PR_DISP_ERR("mdp irq already on %x %x\n", mdp_irq_mask, mask);
 		return -1;
 	}
 	/* if the mdp irq is not already enabled enable it */
@@ -144,7 +146,7 @@ static int locked_disable_mdp_irq(struct mdp_info *mdp, uint32_t mask)
 {
 	/* this interrupt is already disabled! */
 	if (!(mdp_irq_mask & mask)) {
-		printk(KERN_ERR "mdp irq already off %x %x\n",
+		PR_DISP_ERR("mdp irq already off %x %x\n",
 		       mdp_irq_mask, mask);
 		return -1;
 	}
@@ -192,18 +194,19 @@ static irqreturn_t mdp_isr(int irq, void *data)
 	status = mdp_readl(mdp, MDP_INTR_STATUS);
 	mdp_writel(mdp, status, MDP_INTR_CLEAR);
 
-//	pr_info("%s: status=%08x (irq_mask=%08x)\n", __func__, status,
+//	PR_DISP_INFO("%s: status=%08x (irq_mask=%08x)\n", __func__, status,
 //		mdp_irq_mask);
 
 	if (mdp_dma_timer_enable) {
 		del_timer_sync(&mdp->dma_timer);
 		mdp_dma_timer_enable = 0;
-		pr_err("%s: stop dma timer\n", __func__);
+		PR_DISP_ERR("%s: stop dma timer\n", __func__);
 	}
 
 	status &= mdp_irq_mask;
 #ifdef CONFIG_MSM_MDP40
-	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
+	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
+		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		if(status && mdp->out_if[MSM_MDDI_PMDH_INTERFACE].dma_cb != NULL)
 			status |= (INTR_OVERLAY0_DONE | MDP_DMA_S_DONE);
 	}
@@ -328,21 +331,21 @@ static uint32_t mdp_check_mask(struct mdp_info *mdp, uint32_t mask)
 
 void mdp_dump_blit(struct mdp_blit_req *req)
 {
-	pr_info("%s: src: w=%d h=%d f=0x%x offs=0x%x mem_id=%d\n", __func__,
+	PR_DISP_INFO("%s: src: w=%d h=%d f=0x%x offs=0x%x mem_id=%d\n", __func__,
 		req->src.width, req->src.height, req->src.format,
 		req->src.offset, req->src.memory_id);
-	pr_info("%s: dst: w=%d h=%d f=0x%x offs=0x%x mem_id=%d\n", __func__,
+	PR_DISP_INFO("%s: dst: w=%d h=%d f=0x%x offs=0x%x mem_id=%d\n", __func__,
 		req->dst.width, req->dst.height, req->dst.format,
 		req->dst.offset, req->dst.memory_id);
-	pr_info("%s: src_rect: x=%d y=%d w=%d h=%d\n", __func__,
+	PR_DISP_INFO("%s: src_rect: x=%d y=%d w=%d h=%d\n", __func__,
 		req->src_rect.x, req->src_rect.y, req->src_rect.w,
 		req->src_rect.h);
-	pr_info("%s: dst_rect: x=%d y=%d w=%d h=%d\n", __func__,
+	PR_DISP_INFO("%s: dst_rect: x=%d y=%d w=%d h=%d\n", __func__,
 		req->dst_rect.x, req->dst_rect.y, req->dst_rect.w,
 		req->dst_rect.h);
-	pr_info("%s: alpha=0x%08x\n", __func__, req->alpha);
-	pr_info("%s: transp_max=0x%08x\n", __func__, req->transp_mask);
-	pr_info("%s: flags=%08x\n", __func__, req->flags);
+	PR_DISP_INFO("%s: alpha=0x%08x\n", __func__, req->alpha);
+	PR_DISP_INFO("%s: transp_max=0x%08x\n", __func__, req->transp_mask);
+	PR_DISP_INFO("%s: flags=%08x\n", __func__, req->flags);
 }
 
 int mdp_wait(struct mdp_info *mdp, uint32_t mask, wait_queue_head_t *wq)
@@ -350,20 +353,20 @@ int mdp_wait(struct mdp_info *mdp, uint32_t mask, wait_queue_head_t *wq)
 	int ret = 0;
 	unsigned long irq_flags=0;
 
-//	pr_info("%s: WAITING for 0x%x\n", __func__, mask);
+//	PR_DISP_INFO("%s: WAITING for 0x%x\n", __func__, mask);
 	wait_event_timeout(*wq, !mdp_check_mask(mdp, mask), HZ);
 
 	spin_lock_irqsave(&mdp->lock, irq_flags);
 	if (mdp_irq_mask & mask) {
 		locked_disable_mdp_irq(mdp, mask);
-		pr_warning("%s: timeout waiting for mdp to complete 0x%x\n",
+		PR_DISP_WARN("%s: timeout waiting for mdp to complete 0x%x\n",
 			   __func__, mask);
 	if(timeout_req)
 		mdp_dump_blit(timeout_req);
 
 		ret = -ETIMEDOUT;
 	} else {
-//		pr_info("%s: SUCCESS waiting for 0x%x\n", __func__, mask);
+//		PR_DISP_INFO("%s: SUCCESS waiting for 0x%x\n", __func__, mask);
 	}
 	spin_unlock_irqrestore(&mdp->lock, irq_flags);
 
@@ -388,7 +391,7 @@ static void mdp_dma_wait(struct mdp_device *mdp_dev, int interface)
 		wq = &mdp->out_if[interface].dma_waitqueue;
 		break;
 	default:
-		pr_err("%s: Unknown interface %d\n", __func__, interface);
+		PR_DISP_ERR("%s: Unknown interface %d\n", __func__, interface);
 		BUG();
 	}
 
@@ -398,7 +401,7 @@ static void mdp_dma_wait(struct mdp_device *mdp_dev, int interface)
 		timeout_count = 0;
 
 	if (timeout_count > MDP_MAX_TIMEOUTS) {
-		printk(KERN_ERR "mdp: dma failed %d times, somethings wrong!\n",
+		PR_DISP_ERR("mdp: dma failed %d times, somethings wrong!\n",
 		       MDP_MAX_TIMEOUTS);
 		BUG();
 	}
@@ -573,7 +576,7 @@ void mdp_dma(struct mdp_device *mdp_dev, uint32_t addr, uint32_t stride,
 
 	if (interface < 0 || interface >= MSM_MDP_NUM_INTERFACES ||
 	    !mdp->out_if[interface].registered) {
-		pr_err("%s: Unknown interface: %d\n", __func__, interface);
+		PR_DISP_ERR("%s: Unknown interface: %d\n", __func__, interface);
 		BUG();
 	}
 	out_if = &mdp->out_if[interface];
@@ -582,12 +585,12 @@ void mdp_dma(struct mdp_device *mdp_dev, uint32_t addr, uint32_t stride,
 	if (locked_enable_mdp_irq(mdp, out_if->dma_mask)) {
 		mdp_dma_user_requested++;
                 if (mdp_dma_user_requested > 2) {
-                        pr_err("%s: really busy? start dma timer\n", __func__);
+                        PR_DISP_ERR("%s: really busy? start dma timer\n", __func__);
 			/* something wrong in dma, workaround it */
 			mdp_dma_timer_enable = 1;
 			mdp_dma_user_requested = 0;
                 } else {
-			pr_err("%s: busy\n", __func__);
+			PR_DISP_ERR("%s: busy\n", __func__);
 			goto done;
 		}
 	} else
@@ -598,7 +601,7 @@ void mdp_dma(struct mdp_device *mdp_dev, uint32_t addr, uint32_t stride,
 
 	if (mdp_dma_timer_enable) {
 		mdp_writel(mdp, mdp_irq_mask & ~out_if->dma_mask, MDP_INTR_ENABLE);
-		pr_err("%s: start dma timer\n", __func__);
+		PR_DISP_ERR("%s: start dma timer\n", __func__);
 		mod_timer(&mdp->dma_timer,
 			jiffies + msecs_to_jiffies(30));
 	}
@@ -757,7 +760,7 @@ int mdp_start_histogram(struct mdp_device *mdp_dev, struct fb_info *info)
 
 	mutex_lock(&mdp_hist_mutex);
 	if (mdp_is_hist_start == true) {
-               printk(KERN_ERR "%s histogram already started\n", __func__);
+               PR_DISP_ERR("%s histogram already started\n", __func__);
                ret= -EPERM;
                goto mdp_hist_start_err;
 	}
@@ -785,7 +788,7 @@ int mdp_stop_histogram(struct mdp_device *mdp_dev, struct fb_info *info)
 
 	mutex_lock(&mdp_hist_mutex);
 	if (!mdp_is_hist_start) {
-		printk(KERN_ERR "%s histogram already stopped\n", __func__);
+		PR_DISP_ERR("%s histogram already stopped\n", __func__);
 		ret = -EPERM;
 		goto mdp_hist_stop_err;
 	}
@@ -807,16 +810,17 @@ mdp_hist_stop_err:
 static int mdp_do_histogram(struct mdp_device *mdp_dev, struct mdp_histogram *hist, struct mdp_histogram *out)
 {
 	int ret = 0;
-
+	struct mdp_info *mdp = container_of(mdp_dev, struct mdp_info, mdp_dev);
 	if (!hist->frame_cnt || (hist->bin_cnt == 0) ||
                                  (hist->bin_cnt > MDP_HIST_MAX_BIN))
                 return -EINVAL;
 	mutex_lock(&mdp_hist_mutex);
 	if (!mdp_is_hist_start) {
-		printk(KERN_ERR "%s histogram not started\n", __func__);
+		PR_DISP_ERR("%s histogram not started\n", __func__);
 		mutex_unlock(&mdp_hist_mutex);
 		return -EPERM;
 	}
+	enable_mdp_irq(mdp, INTR_DMA_P_HISTOGRAM | INTR_PRIMARY_INTF_UDERRUN);
 	mutex_unlock(&mdp_hist_mutex);
 
         INIT_COMPLETION(mdp_hist_comp);
@@ -832,7 +836,7 @@ static int mdp_do_histogram(struct mdp_device *mdp_dev, struct mdp_histogram *hi
 	out->r = mdp_hist.r;
 	out->g = mdp_hist.g;
 	out->b = mdp_hist.b;
-
+	disable_mdp_irq(mdp, INTR_DMA_P_HISTOGRAM | INTR_PRIMARY_INTF_UDERRUN);
         return ret;
 }
 
@@ -895,14 +899,14 @@ int mdp_out_if_register(struct mdp_device *mdp_dev, int interface,
 	int ret = 0;
 
 	if (interface < 0 || interface >= MSM_MDP_NUM_INTERFACES) {
-		pr_err("%s: invalid interface (%d)\n", __func__, interface);
+		PR_DISP_ERR("%s: invalid interface (%d)\n", __func__, interface);
 		return -EINVAL;
 	}
 
 	spin_lock_irqsave(&mdp->lock, flags);
 
 	if (mdp->out_if[interface].registered) {
-		pr_err("%s: interface (%d) already registered\n", __func__,
+		PR_DISP_ERR("%s: interface (%d) already registered\n", __func__,
 		       interface);
 		ret = -EINVAL;
 		goto done;
@@ -928,10 +932,10 @@ int mdp_out_if_req_irq(struct mdp_device *mdp_dev, int interface,
 	int ret = 0;
 
 	if (interface < 0 || interface >= MSM_MDP_NUM_INTERFACES) {
-		pr_err("%s: invalid interface (%d)\n", __func__, interface);
+		PR_DISP_ERR("%s: invalid interface (%d)\n", __func__, interface);
 		BUG();
 	} else if (!mdp->out_if[interface].registered) {
-		pr_err("%s: interface (%d) not registered\n", __func__,
+		PR_DISP_ERR("%s: interface (%d) not registered\n", __func__,
 		       interface);
 		BUG();
 	}
@@ -941,7 +945,7 @@ int mdp_out_if_req_irq(struct mdp_device *mdp_dev, int interface,
 	if (mask) {
 		ret = locked_enable_mdp_irq(mdp, mask);
 		if (ret) {
-			pr_err("%s: busy\n", __func__);
+			PR_DISP_ERR("%s: busy\n", __func__);
 			goto done;
 		}
 		mdp->out_if[interface].irq_mask = mask;
@@ -960,7 +964,7 @@ done:
 int register_mdp_client(struct class_interface *cint)
 {
 	if (!mdp_class) {
-		pr_err("mdp: no mdp_class when registering mdp client\n");
+		PR_DISP_ERR("mdp: no mdp_class when registering mdp client\n");
 		return -ENODEV;
 	}
 	cint->class = mdp_class;
@@ -1070,6 +1074,35 @@ mdp_write_regs(struct mdp_info *mdp, const struct mdp_reg *reglist, int size)
 	return 0;
 }
 
+#ifdef CONFIG_MSM_MDP40
+static int mdp_hw_version(void)
+{
+	int mdp_hw_revision;
+	char *cp;
+	uint32_t *hp;
+
+
+	mdp_hw_revision = MDP4_REVISION_NONE;
+
+	/* tlmmgpio2 shadow */
+	cp = (char *)ioremap(0xac001270, 0x16);
+
+	if (cp == NULL)
+		return -1;
+
+	hp = (uint32_t *)cp;	/* HW_REVISION_NUMBER */
+	mdp_hw_revision = *hp;
+	iounmap(cp);
+
+	mdp_hw_revision >>= 28;	/* bit 31:28 */
+	mdp_hw_revision &= 0x0f;
+
+	printk(KERN_INFO "%s: mdp_hw_revision=%x\n",
+				__func__, mdp_hw_revision);
+	return mdp_hw_revision;
+}
+#endif
+
 int mdp_probe(struct platform_device *pdev)
 {
 	struct resource *resource;
@@ -1077,9 +1110,10 @@ int mdp_probe(struct platform_device *pdev)
 	struct mdp_info *mdp;
 	struct msm_mdp_platform_data *pdata = pdev->dev.platform_data;
 
+
 	resource = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!resource) {
-		pr_err("mdp: can not get mdp mem resource!\n");
+		PR_DISP_ERR("mdp: can not get mdp mem resource!\n");
 		return -ENOMEM;
 	}
 
@@ -1091,7 +1125,7 @@ int mdp_probe(struct platform_device *pdev)
 
 	mdp->irq = platform_get_irq(pdev, 0);
 	if (mdp->irq < 0) {
-		pr_err("mdp: can not get mdp irq\n");
+		PR_DISP_ERR("mdp: can not get mdp irq\n");
 		ret = mdp->irq;
 		goto error_get_irq;
 	}
@@ -1099,7 +1133,7 @@ int mdp_probe(struct platform_device *pdev)
 	mdp->base = ioremap(resource->start,
 			    resource->end - resource->start);
 	if (mdp->base == 0) {
-		printk(KERN_ERR "msmfb: cannot allocate mdp regs!\n");
+		PR_DISP_ERR("msmfb: cannot allocate mdp regs!\n");
 		ret = -ENOMEM;
 		goto error_ioremap;
 	}
@@ -1144,7 +1178,10 @@ int mdp_probe(struct platform_device *pdev)
 		mdp->mdp_dev.color_format = pdata->color_format;
 
 #ifdef CONFIG_MSM_MDP40
-	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
+	mdp->hw_version = mdp_hw_version();
+
+	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
+		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		ret = mdp_out_if_register(&mdp->mdp_dev,
 			MSM_MDDI_PMDH_INTERFACE, mdp, INTR_OVERLAY0_DONE
 			| MDP_DMA_S_DONE, mdp4_mddi_overlay);
@@ -1175,14 +1212,14 @@ int mdp_probe(struct platform_device *pdev)
 
 	mdp->clk = clk_get(&pdev->dev, "mdp_clk");
 	if (IS_ERR(mdp->clk)) {
-		printk(KERN_INFO "mdp: failed to get mdp clk");
+		PR_DISP_INFO("mdp: failed to get mdp clk");
 		ret = PTR_ERR(mdp->clk);
 		goto error_get_mdp_clk;
 	}
 
         mdp->ebi1_clk = clk_get(NULL, "ebi1_clk");
         if (IS_ERR(mdp->ebi1_clk)) {
-                pr_err("mdp: failed to get ebi1 clk\n");
+                PR_DISP_ERR("mdp: failed to get ebi1 clk\n");
                 ret = PTR_ERR(mdp->ebi1_clk);
                 goto error_get_ebi1_clk;
         }
@@ -1237,9 +1274,8 @@ int mdp_probe(struct platform_device *pdev)
 
 #if defined (CONFIG_FB_MSM_MDP_ABL)
 	init_completion(&mdp_hist_comp);
-	enable_mdp_irq(mdp, INTR_DMA_P_HISTOGRAM | INTR_PRIMARY_INTF_UDERRUN);
 #endif
-	pr_info("%s: initialized\n", __func__);
+	PR_DISP_INFO("%s: initialized\n", __func__);
 
 	return 0;
 
@@ -1274,7 +1310,7 @@ static int __init mdp_init(void)
 {
 	mdp_class = class_create(THIS_MODULE, "msm_mdp");
 	if (IS_ERR(mdp_class)) {
-		printk(KERN_ERR "Error creating mdp class\n");
+		PR_DISP_ERR("Error creating mdp class\n");
 		return PTR_ERR(mdp_class);
 	}
 	return platform_driver_register(&msm_mdp_driver);

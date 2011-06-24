@@ -22,6 +22,7 @@
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
 #include <mach/msm_panel.h>
+#include <mach/debug_display.h>
 
 #include "mddi_client_eid.h"
 
@@ -90,7 +91,7 @@ static void s6d04d1_wait_vsync(struct msm_panel_data *panel_data)
 
 	if (wait_event_timeout(s6d04d1_vsync_wait, panel->s6d04d1_got_int,
 				HZ/2) == 0)
-		printk(KERN_ERR "timeout waiting for VSYNC\n");
+		PR_DISP_ERR("timeout waiting for VSYNC\n");
 
 	panel->s6d04d1_got_int = 0;
 	/* interrupt clears when screen dma starts */
@@ -107,7 +108,7 @@ static int s6d04d1_suspend(struct msm_panel_data *panel_data)
 
 	ret = bridge_data->uninit(bridge_data, client_data);
 	if (ret) {
-		printk(KERN_INFO "mddi s6d04d1 client: non zero return from "
+		PR_DISP_INFO("mddi s6d04d1 client: non zero return from "
 			"uninit\n");
 		return ret;
 	}
@@ -169,7 +170,7 @@ static int s6d04d1_shutdown(struct msm_panel_data *panel_data)
 	struct msm_mddi_bridge_platform_data *bridge_data =
 		client_data->private_client_data;
 
-	pr_debug("%s\n", __func__);
+	PR_DISP_DEBUG("%s\n", __func__);
 	if(bridge_data->shutdown)
 		return bridge_data->shutdown(bridge_data, client_data);
 
@@ -222,7 +223,7 @@ static int setup_vsync(struct panel_info *panel, int init)
 	if (ret)
 		goto err_request_irq_failed;
 
-	printk(KERN_INFO "vsync on gpio %d now %d\n",
+	PR_DISP_INFO("vsync on gpio %d now %d\n",
 	       gpio, gpio_get_value(gpio));
 	return 0;
 
@@ -247,7 +248,7 @@ static int mddi_s6d04d1_probe(struct platform_device *pdev)
 	struct panel_info *panel = kzalloc(sizeof(struct panel_info),
 					   GFP_KERNEL);
 
-	printk(KERN_DEBUG "%s: enter.\n", __func__);
+	PR_DISP_DEBUG("%s: enter.\n", __func__);
 
 	if (!panel)
 		return -ENOMEM;
@@ -265,7 +266,7 @@ static int mddi_s6d04d1_probe(struct platform_device *pdev)
 	cabc_config.shrink_br = panel_data->shrink_br;
 	cabc_config.change_cabcmode = panel_data->change_cabcmode;
 	if (panel_data->caps & MSMFB_CAP_CABC) {
-		printk(KERN_INFO "CABC enabled\n");
+		PR_DISP_INFO("CABC enabled\n");
 		cabc_config.client = client_data;
 		platform_device_register(&mddi_samsung_cabc);
 	}

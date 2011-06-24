@@ -322,8 +322,26 @@ static void qmi_process_unicast_wds_msg(struct qmi_ctxt *ctxt,
 		break;
 	case 0x0020:
 		if (qmi_get_status(msg, &err)) {
-			printk(KERN_ERR
+			printk(KERN_INFO
 			       "qmi: wds: network start failed (%04x)\n", err);
+			//++Make pdp state always be sent to QMI channel when activating PDP context fails
+			printk(KERN_INFO
+					"qmi: wds: Make pdp state always be sent to QMI channel when activating PDP context fails .\n");
+			ctxt->state = STATE_OFFLINE;
+			ctxt->state_dirty = 1;
+			//--Make pdp state always be sent to QMI channel when activating PDP context fails
+			if (msg->size == 0x000c && (msg->tlv)[10] == 0x0b) {
+				printk(KERN_ERR
+					"qmi: wds: pdp activation collided with CCFC\n");
+				ctxt->state = STATE_OFFLINE;
+				ctxt->state_dirty = 1;
+			}
+			if (msg->size == 0x000c && (msg->tlv)[10] == 0x0c) {
+				printk(KERN_ERR
+					"qmi: wds: pdp activation failed. Cause: Operator-determined barring\n");
+				ctxt->state = STATE_OFFLINE;
+				ctxt->state_dirty = 1;
+			}
 		} else if (qmi_get_tlv(msg, 0x01, sizeof(ctxt->wds_handle), &ctxt->wds_handle)) {
 			printk(KERN_INFO
 			       "qmi: wds no handle?\n");
@@ -648,7 +666,7 @@ static int qmi_print_state(struct qmi_ctxt *ctxt, char *buf, int max)
 	}
 
 	i = scnprintf(buf, max, "STATE=%s\n", statename);
-	i += scnprintf(buf + i, max - i, "CID=%d\n",ctxt->wds_client_id);
+	i += scnprintf(buf + i, max - i, "CID=%d\n",ctxt->misc.minor);
 
 	if (ctxt->state != STATE_ONLINE){
 		return i;

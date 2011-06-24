@@ -17,6 +17,8 @@
 
 #if defined(CONFIG_QCT_LTE)
 #include <mach/lte/msm_rpcrouter.h>
+#elif defined(CONFIG_ARCH_MSM8X60)
+#include <mach/msm_rpcrouter-8x60.h>
 #endif
 
 #ifndef __ASM__ARCH_MSM_RPCROUTER_H

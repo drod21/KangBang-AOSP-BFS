@@ -702,6 +702,7 @@ static void exit_mm(struct task_struct * tsk)
 	mmput(mm);
 }
 
+
 /*
  * When we die, we re-parent all our children.
  * Try to give them to another thread in our thread
@@ -722,6 +723,7 @@ static struct task_struct *find_new_reaper(struct task_struct *father)
 			pid_ns->child_reaper = thread;
 		return thread;
 	}
+
 
 	if (unlikely(pid_ns->child_reaper == father)) {
 		write_unlock_irq(&tasklist_lock);

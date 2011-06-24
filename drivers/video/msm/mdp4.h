@@ -344,6 +344,8 @@ struct mdp4_overlay_pipe *mdp4_overlay_pipe_alloc(int ptype, bool usevg);
 void mdp4_overlay_pipe_free(struct mdp4_overlay_pipe *pipe);
 void mdp4_overlay_dmap_cfg(struct mdp4_overlay_pipe *pipe, int lcdc);
 void mdp4_overlay_dmap_xy(struct mdp4_overlay_pipe *pipe);
+void mdp4_overlay_dmae_cfg(struct mdp4_overlay_pipe *pipe, int lcdc);
+void mdp4_overlay_dmae_xy(struct mdp4_overlay_pipe *pipe);
 void mdp4_overlay_dmas_cfg(struct mdp4_overlay_pipe *pipe, int lcdc);
 void mdp4_overlay_dmas_xy(struct mdp4_overlay_pipe *pipe);
 int mdp4_overlay_active(struct mdp_info *mdp, int mixer);

@@ -119,6 +119,8 @@ static int i2c_device_probe(struct device *dev)
 		client->driver = NULL;
 		i2c_set_clientdata(client, NULL);
 	}
+	pm_runtime_set_active(dev);
+
 	return status;
 }
 

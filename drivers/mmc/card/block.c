@@ -49,7 +49,7 @@ MODULE_ALIAS("mmc:block");
 /*
  * max 8 partitions per card
  */
-#if defined(CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
 #define MMC_SHIFT	6
 #else
 #define MMC_SHIFT	3
@@ -94,11 +94,7 @@ static void mmc_blk_put(struct mmc_blk_data *md)
 	mutex_lock(&open_lock);
 	md->usage--;
 	if (md->usage == 0) {
-		int devmaj = MAJOR(disk_devt(md->disk));
-		int devidx = MINOR(disk_devt(md->disk)) >> MMC_SHIFT;
-
-		if (!devmaj)
-			devidx = md->disk->first_minor >> MMC_SHIFT;
+		int devidx = md->disk->first_minor >> MMC_SHIFT;
 
 		blk_cleanup_queue(md->queue.queue);
 
@@ -268,19 +264,8 @@ mmc_blk_set_blksize(struct mmc_blk_data *md, struct mmc_card *card)
 	mmc_release_host(card->host);
 
 	if (err) {
-		dev_t devt;
-		struct gendisk *disk = md->disk;
-		int retval = blk_alloc_devt(&disk->part0, &devt);
-
 		printk(KERN_ERR "%s: unable to set block size to %d: %d\n",
 			md->disk->disk_name, cmd.arg, err);
-
-		if (retval) {
-			WARN_ON(1);
-			return retval;
-		}
-		disk_to_dev(disk)->devt = devt;
-
 		return -EINVAL;
 	}
 
@@ -437,18 +422,34 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 		} else {
 			brq.cmd.opcode = writecmd;
 			brq.data.flags |= MMC_DATA_WRITE;
-#if 1
+
+#if defined(CONFIG_ARCH_MSM7X30)
 		if (board_emmc_boot())
 			if (mmc_card_mmc(card)) {
-				if (brq.cmd.arg < 131072) {/* 131072 mean modem_st1 partition*/
+				if (brq.cmd.arg < 131073) {/* should not write any value before 131073 */
 					pr_err("%s: pid %d(tgid %d)(%s)\n", __func__,
 						(unsigned)(current->pid), (unsigned)(current->tgid),
 						current->comm);
 					pr_err("ERROR! Attemp to write radio partition start %d size %d\n"
 						, brq.cmd.arg, blk_rq_sectors(req));
 					BUG();
+
 					return 0;
 				}
+#if defined(CONFIG_ARCH_MSM7230)
+				if ((brq.cmd.arg > 143361) && (brq.cmd.arg < 163328)) {
+
+					pr_err("%s: pid %d(tgid %d)(%s)\n", __func__,
+						(unsigned)(current->pid), (unsigned)(current->tgid),
+						current->comm);
+					pr_err("ERROR! Attemp to write radio partition start %d size %d\n"
+						, brq.cmd.arg, blk_rq_sectors(req));
+					BUG();
+
+
+					return 0;
+				}
+#endif
 			}
 #endif
 		}
@@ -744,6 +745,7 @@ static struct mmc_blk_data *mmc_blk_alloc(struct mmc_card *card)
 	md->disk->private_data = md;
 	md->disk->queue = md->queue.queue;
 	md->disk->driverfs_dev = &card->dev;
+	md->disk->flags = GENHD_FL_EXT_DEVT;
 
 	/*
 	 * As discussed on lkml, GENHD_FL_REMOVABLE should:
@@ -884,6 +886,9 @@ static void mmc_blk_remove(struct mmc_card *card)
 		mmc_blk_put(md);
 	}
 	mmc_set_drvdata(card, NULL);
+#ifdef CONFIG_MMC_BLOCK_DEFERRED_RESUME
+	mmc_set_bus_resume_policy(card->host, 0);
+#endif
 }
 
 #ifdef CONFIG_PM

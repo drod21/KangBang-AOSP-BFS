@@ -38,8 +38,20 @@ obj-$(CONFIG_TWL4030_POWER)    += twl4030-power.o
 obj-$(CONFIG_TWL4030_CODEC)	+= twl4030-codec.o
 
 obj-$(CONFIG_MFD_MC13783)	+= mc13783-core.o
+
+ifdef CONFIG_ARCH_MSM8X60
+obj-$(CONFIG_MARIMBA_CORE)	+= marimba-core-8x60.o
+obj-$(CONFIG_MARIMBA_CODEC)     += marimba-codec-8x60.o
+obj-$(CONFIG_MARIMBA_CODEC)     += msm-adie-codec.o
+else
 obj-$(CONFIG_MARIMBA_CORE)	+= marimba-core.o
+obj-$(CONFIG_MARIMBA_CODEC)     += marimba-codec.o
+endif
+
 obj-$(CONFIG_MARIMBA_TSADC)	+= marimba-tsadc.o
+obj-$(CONFIG_BAHAMA_CORE)	+= bahama-core.o
+obj-$(CONFIG_TPS65023)		+= tps65023.o
+obj-$(CONFIG_MFD_MC13783)	+= mc13783-core.o
 
 obj-$(CONFIG_MFD_CORE)		+= mfd-core.o
 
@@ -50,7 +62,9 @@ obj-$(CONFIG_MCP_SA11X0)	+= mcp-sa11x0.o
 obj-$(CONFIG_MCP_UCB1200)	+= ucb1x00-core.o
 obj-$(CONFIG_MCP_UCB1200_TS)	+= ucb1x00-ts.o
 
-obj-$(CONFIG_MARIMBA_CODEC)     += marimba-codec.o
+obj-$(CONFIG_TIMPANI_CODEC)	+= timpani-codec.o
+obj-$(CONFIG_TIMPANI_CODEC)	+= msm-adie-codec.o
+
 ifeq ($(CONFIG_SA1100_ASSABET),y)
 obj-$(CONFIG_MCP_UCB1200)	+= ucb1x00-assabet.o
 endif
@@ -77,5 +91,8 @@ obj-$(CONFIG_MFD_JANZ_CMODIO)	+= janz-cmodio.o
 ifeq ($(CONFIG_MSM_SSBI),y)
 obj-$(CONFIG_PMIC8058)		+= pm8058-core.o
 else
+ifeq ($(CONFIG_ARCH_MSM8X60),y)
 obj-$(CONFIG_PMIC8058)		+= pmic8058.o
+obj-$(CONFIG_PMIC8901)          += pmic8901.o
+endif
 endif

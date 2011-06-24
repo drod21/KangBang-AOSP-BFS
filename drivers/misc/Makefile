@@ -15,13 +15,17 @@ obj-$(CONFIG_TIFM_CORE)       	+= tifm_core.o
 obj-$(CONFIG_TIFM_7XX1)       	+= tifm_7xx1.o
 obj-$(CONFIG_PHANTOM)		+= phantom.o
 ifeq ($(CONFIG_ARCH_MSM7227),y)
-        obj-$(CONFIG_ANDROID_PMEM)      += pmem_7x27.o
+	obj-$(CONFIG_ANDROID_PMEM)	+= pmem_7x27.o
 else
-        ifeq ($(CONFIG_ARCH_MSM7X30),y)
-                obj-$(CONFIG_ANDROID_PMEM)      += pmem_qcom.o
-        else
-obj-$(CONFIG_ANDROID_PMEM)	+= pmem.o
-        endif
+ifeq ($(CONFIG_ARCH_MSM7X30),y)
+	obj-$(CONFIG_ANDROID_PMEM)	+= pmem_qcom.o
+else
+ifeq ($(CONFIG_ARCH_MSM8X60),y)
+	obj-$(CONFIG_ANDROID_PMEM)	+= pmem_8x60.o
+else
+	obj-$(CONFIG_ANDROID_PMEM)	+= pmem.o
+endif
+endif
 endif
 obj-$(CONFIG_SGI_IOC4)		+= ioc4.o
 obj-$(CONFIG_ENCLOSURE_SERVICES) += enclosure.o
@@ -41,12 +45,18 @@ obj-$(CONFIG_C2PORT)		+= c2port/
 obj-$(CONFIG_IWMC3200TOP)      += iwmc3200top/
 obj-y				+= eeprom/
 obj-y				+= cb710/
+obj-y				+= mpu3050/
 obj-$(CONFIG_VMWARE_BALLOON)	+= vmware_balloon.o
 obj-$(CONFIG_WL127X_RFKILL)	+= wl127x-rfkill.o
 obj-$(CONFIG_APANIC)		+= apanic.o
 obj-$(CONFIG_SENSORS_BMA150_SPI)+= bma150_spi.o
 obj-$(CONFIG_PMIC8058_PWM) += pmic8058-pwm.o
+obj-$(CONFIG_PMIC8058_VIBRATOR) += pmic8058-vibrator.o
 ifeq ($(CONFIG_MSM_SSBI),y)
 else
 obj-$(CONFIG_PMIC8058_NFC) += pmic8058-nfc.o
 endif
+obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
+obj-$(CONFIG_PMIC8058_MISC) += pmic8058-misc.o
+obj-$(CONFIG_CABLE_DETECT_8X60) += cable_detect.o
+

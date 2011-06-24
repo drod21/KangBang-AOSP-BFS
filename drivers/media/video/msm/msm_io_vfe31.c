@@ -172,6 +172,7 @@ static struct clk *camio_csi_clk;
 static struct clk *camio_csi_pclk;
 static struct clk *camio_csi_vfe_clk;
 static struct msm_camera_io_ext camio_ext;
+
 static struct resource *camifpadio, *csiio;
 void __iomem *camifpadbase, *csibase;
 
@@ -302,16 +303,16 @@ int msm_camio_clk_enable(enum msm_camio_clk_type clktype)
 		clk = clk_get(NULL, "camif_pad_pclk");
 		break;
 
-	case CAMIO_CSI_CLK:
+	case CAMIO_CSI0_CLK:
 		camio_csi_clk =
 		clk = clk_get(NULL, "csi_clk");
 		msm_camio_clk_rate_set_2(clk, 153600000);
 		break;
-	case CAMIO_CSI_VFE_CLK:
+	case CAMIO_CSI0_VFE_CLK:
 		camio_csi_vfe_clk =
 		clk = clk_get(NULL, "csi_vfe_clk");
 		break;
-	case CAMIO_CSI_PCLK:
+	case CAMIO_CSI0_PCLK:
 		camio_csi_pclk =
 		clk = clk_get(NULL, "csi_pclk");
 		break;
@@ -359,13 +360,13 @@ int msm_camio_clk_disable(enum msm_camio_clk_type clktype)
 	case CAMIO_CAMIF_PAD_PBDG_CLK:
 		clk = camio_camif_pad_pbdg_clk;
 		break;
-	case CAMIO_CSI_CLK:
+	case CAMIO_CSI0_CLK:
 		clk = camio_csi_clk;
 		break;
-	case CAMIO_CSI_VFE_CLK:
+	case CAMIO_CSI0_VFE_CLK:
 		clk = camio_csi_vfe_clk;
 		break;
-	case CAMIO_CSI_PCLK:
+	case CAMIO_CSI0_PCLK:
 		clk = camio_csi_pclk;
 		break;
 	default:
@@ -392,6 +393,86 @@ void msm_camio_clk_rate_set_2(struct clk *clk, int rate)
 	clk_set_rate(clk, rate);
 }
 
+static struct clk *jpeg_clk;
+static struct clk *jpeg_pclk;
+
+int msm_camio_jpeg_clk_enable(void)
+{
+	/* MP*fps*(1 + %blanking)
+	   2MP: 24MHz  ------ 2 x 10 x 1.2
+	   3MP: 36MHz  ------ 3 x 10 x 1.2
+	   5MP: 60MHz  ------ 5 x 10 x 1.2
+	   8MP: 96MHz  ------ 8 x 10 x 1.2
+	  12MP: 144MHz ------12 x 10 x 1.2
+	 */
+	int rc = -1;
+	u32 rate = 144000000;
+
+	if (jpeg_clk  == NULL) {
+		jpeg_clk  = clk_get(NULL, "jpeg_clk");
+		if (jpeg_clk  == NULL) {
+			pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__,
+				rc);
+			goto fail;
+		}
+	}
+
+	rc = clk_set_min_rate(jpeg_clk, rate);
+	if (rc) {
+		pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
+		goto fail;
+	}
+
+	rc = clk_enable(jpeg_clk);
+	if (rc) {
+		pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
+		goto fail;
+	}
+
+	if (jpeg_pclk == NULL) {
+		jpeg_pclk = clk_get(NULL, "jpeg_pclk");
+		if (jpeg_pclk == NULL) {
+			pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__,
+				rc);
+			goto fail;
+		}
+	}
+
+	rc = clk_enable(jpeg_pclk);
+	if (rc) {
+		pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
+		goto fail;
+	}
+
+	/*rc = pm_qos_add_requirement(PM_QOS_SYSTEM_BUS_FREQ,
+		"msm_gemini", MSM_SYSTEM_BUS_RATE);
+	if (rc) {
+		GMN_PR_ERR("request AXI bus QOS fails. rc = %d\n", rc);
+		goto fail;
+	}*/
+
+	return rc;
+
+fail:
+	pr_err("%s:%d] fail rc = %d\n", __func__, __LINE__, rc);
+	return rc;
+}
+
+int msm_camio_jpeg_clk_disable(void)
+{
+	clk_disable(jpeg_clk);
+	clk_put(jpeg_clk);
+	jpeg_clk = NULL;
+
+	clk_disable(jpeg_pclk);
+	clk_put(jpeg_pclk);
+	jpeg_pclk = NULL;
+
+	//pm_qos_remove_requirement(PM_QOS_SYSTEM_BUS_FREQ, "msm_gemini");
+	return 0;
+}
+
+
 static irqreturn_t msm_io_csi_irq(int irq_num, void *data)
 {
 	uint32_t irq;
@@ -400,49 +481,49 @@ static irqreturn_t msm_io_csi_irq(int irq_num, void *data)
 
 	if (irq & MIPI_IMASK_ERROR_OCCUR) {
 		if (irq & MIPI_IMASK_ERR_SOT)
-			pr_err("msm_io_csi_irq: SOT error\n");
+			pr_info("[CAM]msm_io_csi_irq: SOT error\n");
 		if (irq & MIPI_IMASK_ERR_SOT_SYNC)
-			pr_err("msm_io_csi_irq: SOT SYNC error\n");
+			pr_info("[CAM]msm_io_csi_irq: SOT SYNC error\n");
 		if (irq & MIPI_IMASK_CLK_CTL_ERROR)
-			pr_err("msm_io_csi_irq: Clock lane ULPM mode sequence or command error\n");
+			pr_info("[CAM]msm_io_csi_irq: Clock lane ULPM mode sequence or command error\n");
 		if (irq & MIPI_IMASK_DATA_CTL_ERROR)
-			pr_err("msm_io_csi_irq: Data lane ULPM mode sequence or command error\n");
+			pr_info("[CAM]msm_io_csi_irq: Data lane ULPM mode sequence or command error\n");
 #if 0
 		if (irq & MIPI_IMASK_CLK_CMM_ERROR) /* defeatured */
-			pr_err("msm_io_csi_irq: Common mode error detected by PHY CLK lane\n");
+			pr_err("[CAM]msm_io_csi_irq: Common mode error detected by PHY CLK lane\n");
 		if (irq & MIPI_IMASK_DATA_CMM_ERROR) /* defeatured */
-			pr_err("msm_io_csi_irq: Common mode error detected by PHY data lane\n");
+			pr_err("[CAM]msm_io_csi_irq: Common mode error detected by PHY data lane\n");
 #endif
 		if (irq & MIPI_IMASK_DL0_SYNC_ERROR)
-			pr_err("msm_io_csi_irq: An error occured while synchronizing data " \
+			pr_info("[CAM]msm_io_csi_irq: An error occured while synchronizing data " \
 				"from PHY to VFE clock domain on data lane 0\n");
 		if (irq & MIPI_IMASK_DL1_SYNC_ERROR)
-			pr_err("msm_io_csi_irq: An error occured while synchronizing data " \
+			pr_info("[CAM]msm_io_csi_irq: An error occured while synchronizing data " \
 				"from PHY to VFE clock domain on data lane 1\n");
 		if (irq & MIPI_IMASK_DL2_SYNC_ERROR)
-			pr_err("msm_io_csi_irq: An error occured while synchronizing data " \
+			pr_info("[CAM]msm_io_csi_irq: An error occured while synchronizing data " \
 				"from PHY to VFE clock domain on data lane 2\n");
 		if (irq & MIPI_IMASK_DL3_SYNC_ERROR)
-			pr_err("msm_io_csi_irq: An error occured while synchronizing data " \
+			pr_info("[CAM]msm_io_csi_irq: An error occured while synchronizing data " \
 				"from PHY to VFE clock domain on data lane 3\n");
 		if (irq & MIPI_IMASK_ECC_ERROR)
-			pr_err("msm_io_csi_irq: ECC error\n");
+			pr_info("[CAM]msm_io_csi_irq: ECC error\n");
 		if (irq & MIPI_IMASK_CRC_ERROR)
-			pr_err("msm_io_csi_irq: CRC error\n");
+			pr_info("[CAM]msm_io_csi_irq: CRC error\n");
 		if (irq & MIPI_IMASK_FRAME_SYNC_ERROR)
-			pr_err("msm_io_csi_irq: FS not paired with FE\n");
+			pr_info("[CAM]msm_io_csi_irq: FS not paired with FE\n");
 		if (irq & MIPI_IMASK_ID_ERROR)
-			pr_err("msm_io_csi_irq: Long packet ID not defined\n");
+			pr_info("[CAM]msm_io_csi_irq: Long packet ID not defined\n");
 		if (irq & MIPI_IMASK_EOT_ERROR)
-			pr_err("msm_io_csi_irq: The received data is less than the value indicated by WC\n");
+			pr_info("[CAM]msm_io_csi_irq: The received data is less than the value indicated by WC\n");
 		if (irq & MIPI_IMASK_DL0_FIFO_OVERFLOW)
-			pr_err("msm_io_csi_irq: Data lane 0 FIFO overflow\n");
+			pr_info("[CAM]msm_io_csi_irq: Data lane 0 FIFO overflow\n");
 		if (irq & MIPI_IMASK_DL1_FIFO_OVERFLOW)
-			pr_err("msm_io_csi_irq: Data lane 1 FIFO overflow\n");
+			pr_info("[CAM]msm_io_csi_irq: Data lane 1 FIFO overflow\n");
 		if (irq & MIPI_IMASK_DL2_FIFO_OVERFLOW)
-			pr_err("msm_io_csi_irq: Data lane 2 FIFO overflow\n");
+			pr_info("[CAM]msm_io_csi_irq: Data lane 2 FIFO overflow\n");
 		if (irq & MIPI_IMASK_DL3_FIFO_OVERFLOW)
-			pr_err("msm_io_csi_irq: Data lane 3 FIFO overflow\n");
+			pr_info("[CAM]msm_io_csi_irq: Data lane 3 FIFO overflow\n");
 	}
 
 	msm_io_w(irq, csibase + MIPI_INTERRUPT_STATUS);
@@ -496,9 +577,9 @@ int msm_camio_enable(struct platform_device *pdev)
 		if (rc < 0)
 			goto csi_irq_fail;
 		/* enable required clocks for CSI */
-		msm_camio_clk_enable(CAMIO_CSI_PCLK);
-		msm_camio_clk_enable(CAMIO_CSI_VFE_CLK);
-		msm_camio_clk_enable(CAMIO_CSI_CLK);
+		msm_camio_clk_enable(CAMIO_CSI0_PCLK);
+		msm_camio_clk_enable(CAMIO_CSI0_VFE_CLK);
+		msm_camio_clk_enable(CAMIO_CSI0_CLK);
 
 		val = (20 << MIPI_PHY_D0_CONTROL2_SETTLE_COUNT_SHFT) |
 			(0x0F << MIPI_PHY_D0_CONTROL2_HS_TERM_IMP_SHFT) |
@@ -561,9 +642,9 @@ void msm_camio_disable(struct platform_device *pdev)
 		msleep(10);
 
 		free_irq(camio_ext.csiirq, 0);
-		msm_camio_clk_disable(CAMIO_CSI_PCLK);
-		msm_camio_clk_disable(CAMIO_CSI_VFE_CLK);
-		msm_camio_clk_disable(CAMIO_CSI_CLK);
+		msm_camio_clk_disable(CAMIO_CSI0_PCLK);
+		msm_camio_clk_disable(CAMIO_CSI0_VFE_CLK);
+		msm_camio_clk_disable(CAMIO_CSI0_CLK);
 		iounmap(csibase);
 		release_mem_region(camio_ext.csiphy, camio_ext.csisz);
 	}

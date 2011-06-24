@@ -2222,7 +2222,13 @@ config FB_BROADSHEET
 	  and could also have been called by other names when coupled with
 	  a bridge adapter.
 
+if ARCH_MSM8X60
+	source "drivers/video/msm_8x60/Kconfig"
+endif
+
+if !ARCH_MSM8X60
 source "drivers/video/msm/Kconfig"
+endif
 
 source "drivers/video/omap/Kconfig"
 source "drivers/video/omap2/Kconfig"
@@ -2237,5 +2243,13 @@ endif
 if FB || SGI_NEWPORT_CONSOLE
 	source "drivers/video/logo/Kconfig"
 endif
+
+config FB_DUMMY
+	tristate "Dummy Frame Buffer support (FOR VNC USE)"
+	depends on FB
+	default n
+	help
+	  This driver implements dummy frame buffer for VNC use.
+	  Enabled FB_DUMMY only if the display driver is not ready.
 
 endmenu

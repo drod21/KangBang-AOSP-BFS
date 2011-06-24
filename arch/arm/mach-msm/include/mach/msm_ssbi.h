@@ -25,9 +25,17 @@ struct msm_ssbi_slave_info {
 	void		*platform_data;
 };
 
+enum msm_ssbi_controller_type {
+	MSM_SBI_CTRL_SSBI = 0,
+	MSM_SBI_CTRL_SSBI2,
+	MSM_SBI_CTRL_PMIC_ARBITER,
+};
+
 struct msm_ssbi_platform_data {
 	struct msm_ssbi_slave_info	slave;
 	const char			*rspinlock_name;
+	const char *rsl_id;
+	enum msm_ssbi_controller_type controller_type;
 };
 
 int msm_ssbi_write(struct device *dev, u16 addr, u8 *buf, int len);

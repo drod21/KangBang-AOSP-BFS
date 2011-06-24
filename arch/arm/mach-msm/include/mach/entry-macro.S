@@ -1,22 +1,33 @@
-/* arch/arm/mach-msm7200/include/mach/entry-macro.S
+/*
+ * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
  *
- * Copyright (C) 2007 Google, Inc.
- * Author: Brian Swetland <swetland@google.com>
- *
- * This software is licensed under the terms of the GNU General Public
- * License version 2, as published by the Free Software Foundation, and
- * may be copied, distributed, and modified under those terms.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 and
+ * only version 2 as published by the Free Software Foundation.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA
+ * 02110-1301, USA.
  */
 
+#ifdef CONFIG_ARCH_MSM8X60
+#if defined(CONFIG_MSM_VIC)
+#include <mach/entry-macro-vic.S>
+#elif defined(CONFIG_ARM_GIC)
+#include <mach/entry-macro-qgic.S>
+#else
+#error "No interrupt controller selected!"
+#endif
+#else
 #include <mach/msm_iomap.h>
 
- 	.macro	disable_fiq
+	.macro	disable_fiq
 	.endm
 
 	.macro	get_irqnr_preamble, base, tmp
@@ -36,3 +47,4 @@
 	ldr	\irqnr, [\base, #0xD4]
 	cmp	\irqnr, #0xffffffff
 	.endm
+#endif

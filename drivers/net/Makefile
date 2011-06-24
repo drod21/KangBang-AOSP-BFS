@@ -104,7 +104,7 @@ obj-$(CONFIG_ADAPTEC_STARFIRE) += starfire.o
 obj-$(CONFIG_RIONET) += rionet.o
 obj-$(CONFIG_SH_ETH) += sh_eth.o
 obj-$(CONFIG_STMMAC_ETH) += stmmac/
-obj-$(CONFIG_KINETO_GAN) += kineto_gan.o
+obj-$(CONFIG_GAN_ETH) += gan-eth.o
 
 #
 # end link order section
@@ -291,10 +291,14 @@ obj-$(CONFIG_FS_ENET) += fs_enet/
 
 obj-$(CONFIG_NETXEN_NIC) += netxen/
 
+ifdef CONFIG_ARCH_MSM8X60
+obj-$(CONFIG_MSM_RMNET) += msm_rmnet-8x60.o
+else
 ifndef CONFIG_QCT_LTE
 obj-$(CONFIG_MSM_RMNET) += msm_rmnet.o
 else
 obj-$(CONFIG_QCT_LTE) += lte/
+endif
 endif
 obj-$(CONFIG_NIU) += niu.o
 obj-$(CONFIG_VIRTIO_NET) += virtio_net.o

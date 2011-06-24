@@ -65,7 +65,7 @@
 /* Command is not implemented by the driver.  */
 #define VDEC_S_BUSY	(VDEC_S_BASE + 13)
 
-#define VDEC_INTF_VER   	1
+#define VDEC_INTF_VER	1
 #define VDEC_MSG_BASE	0x0000000
 /* Codes to identify asynchronous message responses and events that driver
   wants to communicate to the app.*/
@@ -95,10 +95,12 @@
 #define VDEC_BUFFERFLAG_CODECCONFIG	0x00000080
 
 /*Post processing flags bit masks*/
-#define VDEC_EXTRADATA_QP	0x00000001
-#define VDEC_EXTRADATA_SEI	0x00000002
-#define VDEC_EXTRADATA_VUI	0x00000004
-#define VDEC_EXTRADATA_MB_ERROR_MAP 0x00000008
+#define VDEC_EXTRADATA_NONE 0x001
+#define VDEC_EXTRADATA_QP 0x004
+#define VDEC_EXTRADATA_MB_ERROR_MAP 0x008
+#define VDEC_EXTRADATA_SEI 0x010
+#define VDEC_EXTRADATA_VUI 0x020
+#define VDEC_EXTRADATA_VC1 0x040
 
 #define VDEC_CMDBASE	0x800
 #define VDEC_CMD_SET_INTF_VERSION	(VDEC_CMDBASE)
@@ -203,6 +205,18 @@ struct vdec_ioctl_msg {
 
 #define VDEC_IOCTL_SET_PICTURE_ORDER \
 	_IOW(VDEC_IOCTL_MAGIC, 28, struct vdec_ioctl_msg)
+
+#define VDEC_IOCTL_SET_FRAME_RATE \
+	_IOW(VDEC_IOCTL_MAGIC, 29, struct vdec_ioctl_msg)
+
+#define VDEC_IOCTL_SET_H264_MV_BUFFER \
+	_IOW(VDEC_IOCTL_MAGIC, 30, struct vdec_ioctl_msg)
+
+#define VDEC_IOCTL_FREE_H264_MV_BUFFER \
+	_IOW(VDEC_IOCTL_MAGIC, 31, struct vdec_ioctl_msg)
+
+#define VDEC_IOCTL_GET_MV_BUFFER_SIZE  \
+	_IOR(VDEC_IOCTL_MAGIC, 32, struct vdec_ioctl_msg)
 
 enum vdec_picture {
 	PICTURE_TYPE_I,
@@ -514,6 +528,7 @@ struct vdec_output_frameinfo {
 	size_t len;
 	uint32_t flags;
 	int64_t time_stamp;
+	enum vdec_picture pic_type;
 	void *client_data;
 	void *input_frame_clientdata;
 	struct vdec_framesize framesize;
@@ -535,4 +550,19 @@ struct vdec_framerate {
 	unsigned long fps_denominator;
 	unsigned long fps_numerator;
 };
+
+struct vdec_h264_mv{
+	size_t size;
+	int count;
+	int pmem_fd;
+	int offset;
+};
+
+struct vdec_mv_buff_size{
+	int width;
+	int height;
+	int size;
+	int alignment;
+};
+
 #endif /* end of macro _VDECDECODER_H_ */

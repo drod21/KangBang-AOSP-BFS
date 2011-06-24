@@ -318,6 +318,12 @@ config INPUT_GPIO
 	help
 	  Say Y here if you want to support gpio based keys, wheels etc...
 
+config INPUT_MICROP
+	tristate "MicroP key driver support"
+	depends on MICROP_COMMON
+	help
+	  Say Y here if you want to support uP based keys.
+
 config HP_SDC_RTC
 	tristate "HP SDC Real Time Clock"
 	depends on (GSC || HP300) && SERIO
@@ -428,4 +434,29 @@ config INPUT_DUMMY_KEYPAD
 	help
 	  Say Y here if you want to support dummy keypad driver, wheels etc...
 
+config LIGHTSENSOR_PMIC
+        tristate "LIGHTSENSOR PMIC Driver"
+        help
+          HTC LIGHTSENSOR PMIC support.
+
 endif
+
+config PMIC8058_PWRKEY
+        tristate "PMIC8058 power key support"
+        default n
+        depends on PMIC8058
+        help
+          Say Y here if you want support for the PMIC8058 power key.
+
+          To compile this driver as a module, choose M here: the
+          module will be called pmic8058-pwrkey.
+
+config PMIC8058_OTHC
+        tristate "Qualcomm PMIC8058 OTHC support"
+        default n
+        depends on PMIC8058
+        help
+          Say Y here if you want support PMIC8058 OTHC.
+
+          To compile this driver as a module, choose M here: the
+          module will be called pmic8058-othc.

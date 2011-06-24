@@ -347,6 +347,7 @@ struct spi_device *spi_new_device(struct spi_master *master,
 	WARN_ON(strlen(chip->modalias) >= sizeof(proxy->modalias));
 
 	proxy->chip_select = chip->chip_select;
+	proxy->ext_gpio_cs = chip->ext_gpio_cs;
 	proxy->max_speed_hz = chip->max_speed_hz;
 	proxy->mode = chip->mode;
 	proxy->irq = chip->irq;

@@ -36,7 +36,10 @@ enum batt_ctl_t {
 	ENABLE_SLOW_CHG,
 	ENABLE_FAST_CHG,
 	ENABLE_SUPER_CHG,
-	CHARGER_CHK
+	CHARGER_CHK,
+	TOGGLE_CHARGER,
+	ENABLE_MIN_TAPER,
+	DISABLE_MIN_TAPER
 };
 
 /* This order is the same as htc_power_supplies[]
@@ -68,6 +71,7 @@ enum {
 enum {
 	LINEAR_CHARGER,
 	SWITCH_CHARGER,
+	SWITCH_CHARGER_TPS65200,
 };
 
 struct battery_info_reply {

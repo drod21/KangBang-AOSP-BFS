@@ -33,7 +33,7 @@ static ssize_t fm_radio_store(struct device *dev,
 					 const char *buf, size_t count)
 {
 	fm_radio_status = simple_strtoull(buf, NULL, 10);
-	pr_info("GPIO_EVENT:: fm_radio_status=%d\n", fm_radio_status);
+	KEY_LOGI("GPIO_EVENT:: fm_radio_status=%d\n", fm_radio_status);
 
 	return count;
 }
@@ -43,7 +43,7 @@ static ssize_t fm_radio_show(struct device *dev,
 	return sprintf(buf, "fm_radio_status:%d\n", fm_radio_status);
 }
 
-static DEVICE_ATTR(fm_radio, 0666, fm_radio_show, fm_radio_store);
+static DEVICE_ATTR(fm_radio, 0664, fm_radio_show, fm_radio_store);
 
 struct gpio_event {
 	struct gpio_event_input_devs *input_devs;
@@ -66,7 +66,7 @@ static int gpio_input_event(
 		if (ip->input_devs->dev[devnr] == dev)
 			break;
 	if (devnr == ip->input_devs->count) {
-		pr_err("gpio_input_event: unknown device %p\n", dev);
+		KEY_LOGE("gpio_input_event: unknown device %p\n", dev);
 		return -EIO;
 	}
 
@@ -93,7 +93,7 @@ static int gpio_event_call_all_func(struct gpio_event *ip, int func)
 		for (i = 0; i < ip->info->info_count; i++, ii++) {
 			if ((*ii)->func == NULL) {
 				ret = -ENODEV;
-				pr_err("gpio_event_probe: Incomplete pdata, "
+				KEY_LOGE("gpio_event_probe: Incomplete pdata, "
 					"no function\n");
 				goto err_no_func;
 			}
@@ -102,7 +102,7 @@ static int gpio_event_call_all_func(struct gpio_event *ip, int func)
 			ret = (*ii)->func(ip->input_devs, *ii, &ip->state[i],
 					  func);
 			if (ret) {
-				pr_err("gpio_event_probe: function failed\n");
+				KEY_LOGE("gpio_event_probe: function failed\n");
 				goto err_func_failed;
 			}
 		}
@@ -220,12 +220,12 @@ static int gpio_event_probe(struct platform_device *pdev)
 
 	event_info = pdev->dev.platform_data;
 	if (event_info == NULL) {
-		pr_err("gpio_event_probe: No pdata\n");
+		KEY_LOGE("gpio_event_probe: No pdata\n");
 		return -ENODEV;
 	}
 	if ((!event_info->name && !event_info->names[0]) ||
 	    !event_info->info || !event_info->info_count) {
-		pr_err("gpio_event_probe: Incomplete pdata\n");
+		KEY_LOGE("gpio_event_probe: Incomplete pdata\n");
 		return -ENODEV;
 	}
 	if (!event_info->name)
@@ -237,7 +237,7 @@ static int gpio_event_probe(struct platform_device *pdev)
 		     sizeof(ip->input_devs->dev[0]) * dev_count, GFP_KERNEL);
 	if (ip == NULL) {
 		err = -ENOMEM;
-		pr_err("gpio_event_probe: Failed to allocate private data\n");
+		KEY_LOGE("gpio_event_probe: Failed to allocate private data\n");
 		goto err_kp_alloc_failed;
 	}
 	ip->input_devs = (void*)&ip->state[event_info->info_count];
@@ -247,7 +247,7 @@ static int gpio_event_probe(struct platform_device *pdev)
 		struct input_dev *input_dev = input_allocate_device();
 		if (input_dev == NULL) {
 			err = -ENOMEM;
-			pr_err("gpio_event_probe: "
+			KEY_LOGE("gpio_event_probe: "
 				"Failed to allocate input device\n");
 			goto err_input_dev_alloc_failed;
 		}
@@ -276,7 +276,7 @@ static int gpio_event_probe(struct platform_device *pdev)
 	for (i = 0; i < dev_count; i++) {
 		err = input_register_device(ip->input_devs->dev[i]);
 		if (err) {
-			pr_err("gpio_event_probe: Unable to register %s "
+			KEY_LOGE("gpio_event_probe: Unable to register %s "
 				"input device\n", ip->input_devs->dev[i]->name);
 			goto err_input_register_device_failed;
 		}

@@ -19,16 +19,21 @@ obj-$(CONFIG_SENSORS_BMA250)	+= bma250.o
 obj-$(CONFIG_DS1682)		+= ds1682.o
 obj-$(CONFIG_SENSORS_PCA963X)	+= pca963x.o
 obj-$(CONFIG_SENSORS_TSL2550)	+= tsl2550.o
-obj-$(CONFIG_SENSORS_MT9T013)	+= mt9t013.o
+#obj-$(CONFIG_SENSORS_MT9T013)	+= mt9t013.o
 obj-$(CONFIG_VP_A1026)		+= a1026.o
 obj-$(CONFIG_AMP_TPA2051D3)	+= tpa2051d3.o
+obj-$(CONFIG_AMP_TPA2026)	+= tpa2026.o
+obj-$(CONFIG_AMP_TPA2028)	+= tpa2028.o
 obj-$(CONFIG_AMP_TPA6130A)	+= tpa6130.o
 obj-$(CONFIG_AMP_TPA2018D1)	+= tpa2018d1.o
 obj-$(CONFIG_ARCH_MSM_FLASHLIGHT)	+= adp1650_flashlight.o
 obj-$(CONFIG_INPUT_ISL29028)	+= isl29028.o
+obj-$(CONFIG_INPUT_ISL29029)	+= isl29029.o
 obj-$(CONFIG_SMB329)            += smb329.o
 obj-$(CONFIG_TPS65200)          += tps65200.o
 obj-$(CONFIG_INPUT_CAPELLA_CM3628)          += cm3628.o
+obj-$(CONFIG_SENSORS_CAPSENSE)	+= cap_sense.o
+obj-$(CONFIG_SENSORS_CAPSENSE_EXPRESS)	+= cap_sense_express.o
 
 ifeq ($(CONFIG_I2C_DEBUG_CHIP),y)
 EXTRA_CFLAGS += -DDEBUG

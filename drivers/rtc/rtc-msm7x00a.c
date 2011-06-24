@@ -33,8 +33,12 @@ extern void msm_pm_set_max_sleep_time(int64_t sleep_time_ns);
 
 static const char *rpc_versions[] = {
 #if !defined(CONFIG_MSM_LEGACY_7X00A_AMSS)
+#if (CONFIG_MSM_AMSS_VERSION == 4735)
+	"rs30000048:00010004",
+#else
 	"rs30000048:00040000",
 	"rs30000048:00010000",
+#endif
 #else
 	"rs30000048:0da5b528",
 #endif

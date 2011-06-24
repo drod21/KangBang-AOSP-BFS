@@ -48,6 +48,22 @@ static struct workqueue_struct *workqueue;
 int use_spi_crc = 1;
 module_param(use_spi_crc, bool, 0);
 
+/*
+ * We normally treat cards as removed during suspend if they are not
+ * known to be on a non-removable bus, to avoid the risk of writing
+ * back data to a different card after resume.  Allow this to be
+ * overridden if necessary.
+ */
+#ifdef CONFIG_MMC_UNSAFE_RESUME
+int mmc_assume_removable;
+#else
+int mmc_assume_removable = 1;
+#endif
+module_param_named(removable, mmc_assume_removable, bool, 0644);
+MODULE_PARM_DESC(
+	removable,
+	"MMC/SD cards are removable and may be removed during suspend");
+
 int mmc_schedule_card_removal_work(struct delayed_work *work,
 				     unsigned long delay)
 {
@@ -212,6 +228,7 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 {
 #ifdef CONFIG_WIMAX
 	int ret = 0;
+	struct msmsdcc_host *msm_host = mmc_priv(host);
 #endif
 
 	DECLARE_COMPLETION_ONSTACK(complete);
@@ -222,19 +239,23 @@ void mmc_wait_for_req(struct mmc_host *host, struct mmc_request *mrq)
 	mmc_start_request(host, mrq);
 
 #ifdef CONFIG_WIMAX
-	ret = wait_for_completion_timeout(&complete, msecs_to_jiffies(5000));
-	if (ret <= 0) {
-		struct msmsdcc_host *msm_host = mmc_priv(host);
- 		printk("[ERR] %s: %s wait_for_completion_timeout!\n", __func__, mmc_hostname(host));
-		
-		msmsdcc_stop_data(msm_host);
+#ifdef CONFIG_WIMAX_MMC
+	if ( !(strcmp(mmc_hostname(host), CONFIG_WIMAX_MMC))) {
+		ret = wait_for_completion_timeout(&complete, msecs_to_jiffies(5000));
 
-		mrq->cmd->error = -ETIMEDOUT;
-		msmsdcc_request_end(msm_host, mrq); 	
-	}
-#else
-	wait_for_completion(&complete);
-#endif		
+		if (ret <= 0) {		
+			printk("[ERR] %s: %s wait_for_completion_timeout!\n", __func__, mmc_hostname(host));
+			
+			msmsdcc_stop_data(msm_host);
+	
+			mrq->cmd->error = -ETIMEDOUT;
+			msmsdcc_request_end(msm_host, mrq); 	
+		}
+	} else
+#endif
+#endif
+		wait_for_completion(&complete);
+
 }
 
 EXPORT_SYMBOL(mmc_wait_for_req);
@@ -1000,11 +1021,16 @@ static inline void mmc_bus_put(struct mmc_host *host)
 
 int mmc_resume_bus(struct mmc_host *host)
 {
+	unsigned long flags;
 	int err = 0;
 	if (!mmc_bus_needs_resume(host))
 		return 0;
 
 	printk("%s: Starting deferred resume\n", mmc_hostname(host));
+	spin_lock_irqsave(&host->lock, flags);
+	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
+	spin_unlock_irqrestore(&host->lock, flags);
+
 	mmc_bus_get(host);
 	if (host->bus_ops && !host->bus_dead) {
 		mmc_power_up(host);
@@ -1019,7 +1045,6 @@ int mmc_resume_bus(struct mmc_host *host)
 
 end:
 	mmc_bus_put(host);
-	host->bus_resume_flags &= ~MMC_BUSRESUME_NEEDS_RESUME;
 	printk(KERN_INFO "%s: Deferred resume %s\n", mmc_hostname(host),
 			err ? "failed" : "completed");
 	return err;
@@ -1245,7 +1270,7 @@ void mmc_stop_host(struct mmc_host *host)
 
 	if (host->caps & MMC_CAP_DISABLE)
 		cancel_delayed_work(&host->disable);
-	cancel_delayed_work_sync(&host->detect);
+	cancel_delayed_work(&host->detect);
 	mmc_flush_scheduled_work();
 
 	/* clear pm flags now and let card drivers set them as needed */
@@ -1348,9 +1373,8 @@ EXPORT_SYMBOL(mmc_card_can_sleep);
 /**
  *	mmc_suspend_host - suspend a host
  *	@host: mmc host
- *	@state: suspend mode (PM_SUSPEND_xxx)
  */
-int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
+int mmc_suspend_host(struct mmc_host *host)
 {
 	int err = 0;
 
@@ -1376,9 +1400,14 @@ int mmc_suspend_host(struct mmc_host *host, pm_message_t state)
 			mmc_claim_host(host);
 			mmc_detach_bus(host);
 			mmc_release_host(host);
+			host->pm_flags = 0;
 			err = 0;
 		}
 	}
+#ifdef CONFIG_PM_RUNTIME
+	if (mmc_bus_manual_resume(host))
+		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
+#endif
 	mmc_bus_put(host);
 
 	if (!err && !(host->pm_flags & MMC_PM_KEEP_POWER))
@@ -1399,7 +1428,9 @@ int mmc_resume_host(struct mmc_host *host)
 
 	mmc_bus_get(host);
 	if (mmc_bus_manual_resume(host)) {
+#ifndef CONFIG_PM_RUNTIME
 		host->bus_resume_flags |= MMC_BUSRESUME_NEEDS_RESUME;
+#endif
 		mmc_bus_put(host);
 		return 0;
 	}
@@ -1415,14 +1446,6 @@ int mmc_resume_host(struct mmc_host *host)
 			printk(KERN_WARNING "%s: error %d during resume "
 					    "(card was removed?)\n",
 					    mmc_hostname(host), err);
-			#if 0
-			if (host->bus_ops->remove)
-				host->bus_ops->remove(host);
-			mmc_claim_host(host);
-			mmc_detach_bus(host);
-			mmc_release_host(host);
-			/* no need to bother upper layers */
-			#endif
 			err = 0;
 		}
 	}
@@ -1437,9 +1460,7 @@ int mmc_resume_host(struct mmc_host *host)
 
 	return err;
 }
-
 EXPORT_SYMBOL(mmc_resume_host);
-
 #endif
 
 #ifdef CONFIG_MMC_EMBEDDED_SDIO

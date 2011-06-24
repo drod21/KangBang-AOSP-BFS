@@ -4,6 +4,7 @@
  *  Copyright (C) 1994-2002 Russell King
  *  Copyright (c) 2003 ARM Limited
  *  All Rights Reserved
+ *  Copyright (c) 2009, Code Aurora Forum. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -78,6 +79,10 @@
 ENTRY(stext)
 	setmode	PSR_F_BIT | PSR_I_BIT | SVC_MODE, r9 @ ensure svc mode
 						@ and irqs disabled
+#ifdef CONFIG_SMP_PARALLEL_START
+	bl	__boot_secondary_core
+	bl	__smp_secondary_spin
+#endif
 	mrc	p15, 0, r9, c0, c0		@ get processor id
 	bl	__lookup_processor_type		@ r5=procinfo r9=cpuid
 	movs	r10, r5				@ invalid processor (r5=0)?
@@ -150,7 +155,32 @@ __secondary_data:
 	.long	__secondary_switched
 #endif /* defined(CONFIG_SMP) */
 
+#ifdef CONFIG_SMP_PARALLEL_START
+ENTRY(__boot_secondary_core)
 
+	mrc	p15, 0, r0, c0, c0, 5	@ MPIDR
+	ands	r0, r0, #15		@ What CPU am I
+	movne	pc,lr
+
+	stmfd	sp!, {r5,r6}
+
+	ldr 	r5, =0x2A040020
+	str	r4, [r5] @r4 is boot start address for after decompress zImage
+	mov	r5, #0x0
+	ldr	r6, =0x9035A0
+	str	r5, [r6]
+	ldr	r6, =0x902D80
+	str	r5, [r6]
+	mov	r5, #0x3
+	ldr	r6, =0x902E64
+	str	r5, [r6]
+
+	ldmfd	sp!, {r5,r6}
+
+	mov	pc, lr
+
+ENDPROC(__boot_secondary_core)
+#endif
 
 /*
  * Setup common bits before finally enabling the MMU.  Essentially
@@ -172,10 +202,17 @@ __enable_mmu:
 #ifdef CONFIG_CPU_ICACHE_DISABLE
 	bic	r0, r0, #CR_I
 #endif
+#ifdef CONFIG_EMULATE_DOMAIN_MANAGER_V7
+	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_CLIENT) | \
+		      domain_val(DOMAIN_KERNEL, DOMAIN_CLIENT) | \
+		      domain_val(DOMAIN_TABLE, DOMAIN_CLIENT) | \
+		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+#else
 	mov	r5, #(domain_val(DOMAIN_USER, DOMAIN_CLIENT) | \
 		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
 		      domain_val(DOMAIN_TABLE, DOMAIN_CLIENT) | \
 		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
+#endif
 	mcr	p15, 0, r5, c3, c0, 0		@ load domain access register
 	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
 	b	__turn_mmu_on

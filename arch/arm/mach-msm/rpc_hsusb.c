@@ -140,6 +140,7 @@ void msm_hsusb_phy_reset(void)
 	} else
 		pr_info("msm_hsusb_phy_reset\n");
 
+	return;
 }
 EXPORT_SYMBOL(msm_hsusb_phy_reset);
 

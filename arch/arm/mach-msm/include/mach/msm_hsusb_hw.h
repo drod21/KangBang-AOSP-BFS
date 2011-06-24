@@ -42,6 +42,15 @@
 #define INFO(fmt,args...) \
 	xprintk(KERN_INFO , fmt , ## args)
 
+#define USB_ERR(fmt, args...) \
+	printk(KERN_ERR "[USB:ERR] " fmt, ## args)
+#define USB_WARNING(fmt, args...) \
+	printk(KERN_WARNING "[USB] " fmt, ## args)
+#define USB_INFO(fmt, args...) \
+	printk(KERN_INFO "[USB] " fmt, ## args)
+#define USB_DEBUG(fmt, args...) \
+	printk(KERN_DEBUG "[USB] " fmt, ## args)
+
 /*-------------------------------------------------------------------------*/
 
 

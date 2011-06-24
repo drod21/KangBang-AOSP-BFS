@@ -43,7 +43,14 @@ enum A1026_PathID {
 	A1026_PATH_RECORD_SPEAKER,
 	A1026_PATH_RECORD_BT,
 	A1026_PATH_CAMCORDER,
-	A1026_PATH_INCALL_TTY
+	A1026_PATH_INCALL_TTY,
+	A1026_PATH_MAX
+};
+
+struct A1026_config_data {
+	unsigned int data_len;
+	unsigned int mode_num;
+	unsigned char *cmd_data;  /* [mode][cmd_len][cmds..] */
 };
 
 /* noise suppression states */
@@ -63,7 +70,7 @@ enum A1026_NS_states {
 #define A1026_BOOTUP_INIT  _IOW(A1026_IOCTL_MAGIC, 0x01, struct a1026img *)
 #define A1026_SET_CONFIG   _IOW(A1026_IOCTL_MAGIC, 0x02, enum A1026_PathID)
 #define A1026_SET_NS_STATE _IOW(A1026_IOCTL_MAGIC, 0x03, enum A1026_NS_states)
-
+#define A1026_SET_PARAM	   _IOW(A1026_IOCTL_MAGIC, 0x04,  unsigned)
 /* For Diag */
 #define A1026_SET_MIC_ONOFF	_IOW(A1026_IOCTL_MAGIC, 0x50, unsigned)
 #define A1026_SET_MICSEL_ONOFF	_IOW(A1026_IOCTL_MAGIC, 0x51, unsigned)

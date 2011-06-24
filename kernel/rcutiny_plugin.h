@@ -584,7 +584,7 @@ void call_rcu(struct rcu_head *head, void (*func)(struct rcu_head *rcu))
 {
 	unsigned long flags;
 
-	//debug_rcu_head_queue(head);
+	debug_rcu_head_queue(head);
 	head->func = func;
 	head->next = NULL;
 
@@ -747,7 +747,7 @@ void exit_rcu(void)
 
 #else /* #ifdef CONFIG_TINY_PREEMPT_RCU */
 
- /*
+/*
  * Because preemptible RCU does not exist, it is never necessary to
  * boost preempted RCU readers.
  */
@@ -783,7 +783,6 @@ static void rcu_preempt_process_callbacks(void)
 #endif /* #else #ifdef CONFIG_TINY_PREEMPT_RCU */
 
 #ifdef CONFIG_DEBUG_LOCK_ALLOC
-
 #include <linux/kernel_stat.h>
 
 /*
@@ -797,6 +796,7 @@ void __init rcu_scheduler_starting(void)
 }
 
 #endif /* #ifdef CONFIG_DEBUG_LOCK_ALLOC */
+
 #ifdef CONFIG_RCU_BOOST
 #define RCU_BOOST_PRIO CONFIG_RCU_BOOST_PRIO
 #else /* #ifdef CONFIG_RCU_BOOST */

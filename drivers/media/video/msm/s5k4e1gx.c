@@ -22,6 +22,7 @@
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
 #include <media/msm_camera.h>
+#include <media/msm_camera_sensor.h>
 #include <mach/gpio.h>
 #include <mach/camera.h>
 #include "s5k4e1gx.h"
@@ -474,7 +475,7 @@ static int i2c_transfer_retry(struct i2c_adapter *adap,
 		ns = i2c_transfer(adap, msgs, len);
 		if (ns == len)
 			break;
-		pr_err("%s: try %d/%d: i2c_transfer sent: %d, len %d\n",
+		pr_err("[CAM]%s: try %d/%d: i2c_transfer sent: %d, len %d\n",
 			__func__,
 			i2c_retry, MAX_I2C_RETRIES, ns, len);
 		msleep(10);
@@ -532,7 +533,7 @@ static int s5k4e1gx_i2c_rxdata(unsigned short saddr, unsigned char *rxdata,
 	};
 
 	if (i2c_transfer_retry(s5k4e1gx_client->adapter, msgs, 2) < 0) {
-		pr_err("s5k4e1gx_i2c_rxdata failed!\n");
+		pr_err("[CAM]s5k4e1gx_i2c_rxdata failed!\n");
 		return -EIO;
 	}
 
@@ -552,7 +553,7 @@ static int32_t s5k4e1gx_i2c_txdata(unsigned short saddr,
 	};
 
 	if (i2c_transfer_retry(s5k4e1gx_client->adapter, msg, 1) < 0) {
-		pr_err("s5k4e1gx_i2c_txdata failed\n");
+		pr_err("[CAM]s5k4e1gx_i2c_txdata failed\n");
 		return -EIO;
 	}
 
@@ -580,7 +581,7 @@ static int32_t s5k4e1gx_i2c_read_b(unsigned short saddr, unsigned short raddr,
 	*rdata = buf[0];
 
 	if (rc < 0)
-		printk("s5k4e1gx_i2c_read failed!\n");
+		printk("[CAM]s5k4e1gx_i2c_read failed!\n");
 
 	return rc;
 }
@@ -599,7 +600,7 @@ static int32_t s5k4e1gx_i2c_write_b(unsigned short saddr, unsigned short waddr,
 	rc = s5k4e1gx_i2c_txdata(saddr, buf, 3);
 
 	if (rc < 0)
-		pr_err("i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
+		pr_err("[CAM]i2c_write_b failed, addr = 0x%x, val = 0x%x!\n",
 			 waddr, bdata);
 
 	return rc;
@@ -642,7 +643,7 @@ static int32_t s5k4e1gx_i2c_read_w(unsigned short saddr, unsigned short raddr,
 	*rdata = buf[0] << 8 | buf[1];
 
 	if (rc < 0)
-		pr_err("s5k4e1gx_i2c_read failed!\n");
+		pr_err("[CAM]s5k4e1gx_i2c_read failed!\n");
 
 	return rc;
 }
@@ -673,7 +674,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 
 	mdelay(20);
 
-	pr_info("s5k4e1gx_sensor_init(): reseting sensor.\n");
+	pr_info("[CAM]s5k4e1gx_sensor_init(): reseting sensor.\n");
 
 	rc = s5k4e1gx_i2c_read_w(s5k4e1gx_client->addr,
 		S5K4E1GX_REG_MODEL_ID, &chipid);
@@ -681,7 +682,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 		goto init_probe_fail;
 
 	if (chipid != S5K4E1GX_MODEL_ID) {
-		pr_err("S5K4E1GX wrong model_id = 0x%x\n", chipid);
+		pr_err("[CAM]S5K4E1GX wrong model_id = 0x%x\n", chipid);
 		rc = -ENODEV;
 		goto init_probe_fail;
 	}
@@ -700,7 +701,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 
 	/* Add Lens Correction Common Setting For Maverick*/
 	if (!sdata->sensor_lc_disable) {
-		pr_info("sensor_lc_disable=%d\n", sdata->sensor_lc_disable);
+		pr_info("[CAM]sensor_lc_disable=%d\n", sdata->sensor_lc_disable);
 
 		rc = s5k4e1gx_i2c_write_table(s5k4e1gx_regs.lc_common,
 			s5k4e1gx_regs.lc_common_size);
@@ -711,7 +712,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
     /* Add analog settings For Maverick*/
 	rc = s5k4e1gx_i2c_read_b(s5k4e1gx_client->addr, S5K4E1GX_REVISION_ID, &evt_ver);
 	if (!(rc < 0)) {
-		printk("sensor evt version : 0x%x\n", evt_ver);
+		printk("[CAM]sensor evt version : 0x%x\n", evt_ver);
 		if (evt_ver == S5K4E1GX_REVISION_EVT3)
 			sensor_evt_ver = 3;
 	}
@@ -720,7 +721,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 
     /* Modified the Setting for different sensor revision */
 	if (machine_is_saga()) {
-		printk("use analog_settings_saga\n");
+		printk("[CAM]use analog_settings_saga\n");
 		if (sdata->zero_shutter_mode)
 		rc = s5k4e1gx_i2c_write_table(
 			s5k4e1gx_regs.analog_settings_saga_zero_shutter,
@@ -752,13 +753,13 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 		s5k4e1gx_reg_pat[S_RES_PREVIEW].DPHY_bandctrl = 0xA0;
 		s5k4e1gx_reg_pat[S_RES_CAPTURE].DPHY_bandctrl = 0xA0;
 	} else if (sensor_evt_ver == 3) {
-		printk("use analog_settings_evt3\n");
+		printk("[CAM]use analog_settings_evt3\n");
 		rc = s5k4e1gx_i2c_write_table(s5k4e1gx_regs.analog_settings_evt3,
 				s5k4e1gx_regs.analog_settings_evt3_size);
 		if (rc < 0)
 			goto init_probe_fail;
 	} else {
-		printk("use analog_settings_evt2\n");
+		printk("[CAM]use analog_settings_evt2\n");
 		rc = s5k4e1gx_i2c_write_table(s5k4e1gx_regs.analog_settings_evt2,
 				s5k4e1gx_regs.analog_settings_evt2_size);
 		if (rc < 0)
@@ -850,7 +851,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 	if (data->camera_clk_switch != NULL) {
 	rc = s5k4e1gx_i2c_read_b(s5k4e1gx_client->addr, 0x3110, &reg_status);
 		if (rc < 0) {
-			pr_info("%s: 0x3110 read_b fail\n", __func__);
+			pr_info("[CAM]%s: 0x3110 read_b fail\n", __func__);
 			goto init_probe_fail;
 		}
 
@@ -860,7 +861,7 @@ static int s5k4e1gx_probe_init_sensor(const struct msm_camera_sensor_info *data)
 				0x3110, reg_status);
 
 		if (rc < 0) {
-			pr_info("%s: 0x3110 write_b fail\n", __func__);
+			pr_info("[CAM]%s: 0x3110 write_b fail\n", __func__);
 			goto init_probe_fail;
 		}
 	}
@@ -918,16 +919,16 @@ static int s5k4e1gx_i2c_probe(struct i2c_client *client,
 	const struct i2c_device_id *id)
 {
 	int rc = 0;
-	pr_info("s5k4e1gx_probe called!\n");
+	pr_info("[CAM]s5k4e1gx_probe called!\n");
 
 	if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C)) {
-		pr_err("i2c_check_functionality failed\n");
+		pr_err("[CAM]i2c_check_functionality failed\n");
 		goto probe_failure;
 	}
 
 	s5k4e1gx_sensorw = kzalloc(sizeof(struct s5k4e1gx_work), GFP_KERNEL);
 	if (!s5k4e1gx_sensorw) {
-		pr_err("kzalloc failed.\n");
+		pr_err("[CAM]kzalloc failed.\n");
 		rc = -ENOMEM;
 		goto probe_failure;
 	}
@@ -938,11 +939,11 @@ static int s5k4e1gx_i2c_probe(struct i2c_client *client,
 
 	mdelay(50);
 
-	pr_info("s5k4e1gx_probe successed! rc = %d\n", rc);
+	pr_info("[CAM]s5k4e1gx_probe successed! rc = %d\n", rc);
 	return 0;
 
 probe_failure:
-	pr_err("s5k4e1gx_probe failed! rc = %d\n", rc);
+	pr_err("[CAM]s5k4e1gx_probe failed! rc = %d\n", rc);
 	return rc;
 }
 
@@ -1026,7 +1027,7 @@ static int32_t s5k4e1gx_setting(enum msm_s_reg_update rupdate,
 			s5k4e1gx_csi_params.lane_cnt = 2;
 			s5k4e1gx_csi_params.lane_assign = 0xe4;
 			s5k4e1gx_csi_params.dpcm_scheme = 0;
-			s5k4e1gx_csi_params.settle_cnt = 20;
+			s5k4e1gx_csi_params.settle_cnt = 30;/*0120: QCT //20;*/
 			rc = msm_camio_csi_config(&s5k4e1gx_csi_params);
 
 			s5k4e1gx_ctrl->reg_update = S_UPDATE_PERIODIC;
@@ -1037,7 +1038,7 @@ static int32_t s5k4e1gx_setting(enum msm_s_reg_update rupdate,
 	case S_UPDATE_PERIODIC:
 		/* 1126 for improve shutter of MIPI */
 		if (machine_is_saga() && sdata->zero_shutter_mode) {
-		pr_info("%s:return 0 (S_UPDATE_PERIODIC state)\n", __func__);
+		pr_info("[CAM]%s:return 0 (S_UPDATE_PERIODIC state)\n", __func__);
 			return 0;
 		}
 
@@ -1116,7 +1117,7 @@ static int32_t s5k4e1gx_setting(enum msm_s_reg_update rupdate,
 
 			/* Lens Correction for Preview or Capture */
 		if (!sdata->sensor_lc_disable) {
-		pr_info("sensor_lc_disable=%d\n", sdata->sensor_lc_disable);
+		pr_info("[CAM]sensor_lc_disable=%d\n", sdata->sensor_lc_disable);
 			if (rt == S_RES_PREVIEW) {
 			rc = s5k4e1gx_i2c_write_table(s5k4e1gx_regs.lc_preview,
 					s5k4e1gx_regs.lc_preview_size);
@@ -1332,7 +1333,7 @@ static int32_t s5k4e1gx_setting(enum msm_s_reg_update rupdate,
 			  if (!sdata->zero_shutter_mode)
 				s5k4e1gx_extra_settings_for_mipi(rt);
 			  else
-				pr_info("%s: improve shutter lag\n", __func__);
+				pr_info("[CAM]%s: improve shutter lag\n", __func__);
 			} else {
 				/*awii: for the analog*/
 				if (fps_mode_sel == 1) {
@@ -1355,7 +1356,7 @@ static int32_t s5k4e1gx_setting(enum msm_s_reg_update rupdate,
 		    /* Write Setting Table */
 			/* 1126 for improve shutter of MIPI */
 			if (sdata->csi_if && sdata->zero_shutter_mode) {
-			pr_info("s5k4e1gx_setting(): setup tb1_4\n");
+			pr_info("[CAM]s5k4e1gx_setting(): setup tb1_4\n");
 			rc = s5k4e1gx_i2c_write_table(&tbl_4[0],
 					ARRAY_SIZE(tbl_4));
 			} else {
@@ -1405,39 +1406,39 @@ static int s5k4e1gx_i2c_read_fuseid(struct sensor_cfg_data *cdata)
 	unsigned short i, R1, R2, R3;
 	unsigned short  OTP[10] = {0};
 
-	pr_info("%s: sensor OTP information:\n", __func__);
+	pr_info("[CAM]%s: sensor OTP information:\n", __func__);
 
 	rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr, 0x30F9, 0x0E);
 	if (rc < 0)
-		pr_info("%s: i2c_write_b 0x30F9 fail\n", __func__);
+		pr_info("[CAM]%s: i2c_write_b 0x30F9 fail\n", __func__);
 
 	rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr, 0x30FA, 0x0A);
 	if (rc < 0)
-		pr_info("%s: i2c_write_b 0x30FA fail\n", __func__);
+		pr_info("[CAM]%s: i2c_write_b 0x30FA fail\n", __func__);
 
 	rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr, 0x30FB, 0x71);
 	if (rc < 0)
-		pr_info("%s: i2c_write_b 0x30FB fail\n", __func__);
+		pr_info("[CAM]%s: i2c_write_b 0x30FB fail\n", __func__);
 
 	rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr, 0x30FB, 0x70);
 	if (rc < 0)
-		pr_info("%s: i2c_write_b 0x30FB fail\n", __func__);
+		pr_info("[CAM]%s: i2c_write_b 0x30FB fail\n", __func__);
 
 	mdelay(4);
 
 	for (i = 0; i < 10; i++) {
 		rc = s5k4e1gx_i2c_write_b(s5k4e1gx_client->addr, 0x310C, i);
 			if (rc < 0)
-			pr_info("%s: i2c_write_b 0x310C fail\n", __func__);
+			pr_info("[CAM]%s: i2c_write_b 0x310C fail\n", __func__);
 		rc = s5k4e1gx_i2c_read_b(s5k4e1gx_client->addr, 0x310F, &R1);
 			if (rc < 0)
-			pr_info("%s: i2c_read_b 0x310F fail\n", __func__);
+			pr_info("[CAM]%s: i2c_read_b 0x310F fail\n", __func__);
 		rc = s5k4e1gx_i2c_read_b(s5k4e1gx_client->addr, 0x310E, &R2);
 			if (rc < 0)
-			pr_info("%s: i2c_read_b 0x310E fail\n", __func__);
+			pr_info("[CAM]%s: i2c_read_b 0x310E fail\n", __func__);
 		rc = s5k4e1gx_i2c_read_b(s5k4e1gx_client->addr, 0x310D, &R3);
 			if (rc < 0)
-			pr_info("%s: i2c_read_b 0x310D fail\n", __func__);
+			pr_info("[CAM]%s: i2c_read_b 0x310D fail\n", __func__);
 
 		if ((R3&0x0F) != 0)
 			OTP[i] = (short)(R3&0x0F);
@@ -1451,9 +1452,9 @@ static int s5k4e1gx_i2c_read_fuseid(struct sensor_cfg_data *cdata)
 			OTP[i] = (short)(R1>>4);
 
 	}
-	pr_info("%s: VenderID=%x,LensID=%x,SensorID=%x%x\n", __func__,
+	pr_info("[CAM]%s: VenderID=%x,LensID=%x,SensorID=%x%x\n", __func__,
 		OTP[0], OTP[1], OTP[2], OTP[3]);
-	pr_info("%s: ModuleFuseID= %x%x%x%x%x%x\n", __func__,
+	pr_info("[CAM]%s: ModuleFuseID= %x%x%x%x%x%x\n", __func__,
 		OTP[4], OTP[5], OTP[6], OTP[7], OTP[8], OTP[9]);
 
     cdata->cfg.fuse.fuse_id_word1 = 0;
@@ -1467,13 +1468,13 @@ static int s5k4e1gx_i2c_read_fuseid(struct sensor_cfg_data *cdata)
 		(OTP[8]<<4) |
 		(OTP[9]);
 
-	pr_info("s5k4e1gx: fuse->fuse_id_word1:%d\n",
+	pr_info("[CAM]s5k4e1gx: fuse->fuse_id_word1:%d\n",
 		cdata->cfg.fuse.fuse_id_word1);
-	pr_info("s5k4e1gx: fuse->fuse_id_word2:%d\n",
+	pr_info("[CAM]s5k4e1gx: fuse->fuse_id_word2:%d\n",
 		cdata->cfg.fuse.fuse_id_word2);
-	pr_info("s5k4e1gx: fuse->fuse_id_word3:0x%08x\n",
+	pr_info("[CAM]s5k4e1gx: fuse->fuse_id_word3:0x%08x\n",
 		cdata->cfg.fuse.fuse_id_word3);
-	pr_info("s5k4e1gx: fuse->fuse_id_word4:0x%08x\n",
+	pr_info("[CAM]s5k4e1gx: fuse->fuse_id_word4:0x%08x\n",
 		cdata->cfg.fuse.fuse_id_word4);
 	return 0;
 }
@@ -1484,16 +1485,16 @@ static int s5k4e1gx_sensor_open_init(struct msm_camera_sensor_info *data)
 	struct msm_camera_sensor_info *sinfo = s5k4e1_pdev->dev.platform_data;
 
 	if (fps_mode_sel == 1) {
-		pr_info("s5k4e1gx_setting PREVIEW AT 60FPS THIS TIME\n");
+		pr_info("[CAM]s5k4e1gx_setting PREVIEW AT 60FPS THIS TIME\n");
 		toUseCand = 1;
 	} else {
-		pr_info("s5k4e1gx_setting PREVIEW AT normal\n");
+		pr_info("[CAM]s5k4e1gx_setting PREVIEW AT normal\n");
 		toUseCand = 0;
 	}
 
 	/* 1126 for improve shutter of MIPI */
 	if (machine_is_saga()) {
-	pr_info("%s: get s5k4e1gx_reg_zero_shutter setting\n", __func__);
+	pr_info("[CAM]%s: get s5k4e1gx_reg_zero_shutter setting\n", __func__);
 	memcpy(&(s5k4e1gx_reg_pat[S_RES_PREVIEW]),
 		&(s5k4e1gx_reg_zero_shutter[0]), sizeof(struct reg_struct));
 	} else {
@@ -1502,7 +1503,7 @@ static int s5k4e1gx_sensor_open_init(struct msm_camera_sensor_info *data)
 	}
 	s5k4e1gx_ctrl = kzalloc(sizeof(struct s5k4e1gx_ctrl), GFP_KERNEL);
 	if (!s5k4e1gx_ctrl) {
-		pr_err("s5k4e1gx_init failed!\n");
+		pr_err("[CAM]s5k4e1gx_init failed!\n");
 		rc = -ENOMEM;
 		goto init_done;
 	}
@@ -1519,18 +1520,18 @@ static int s5k4e1gx_sensor_open_init(struct msm_camera_sensor_info *data)
 
 	/* 1126 for improve shutter of MIPI */
 	if (data->csi_if && data->zero_shutter_mode) {
-		pr_info("%s: set prev_res = S_FULL_SIZE\n", __func__);
+		pr_info("[CAM]%s: set prev_res = S_FULL_SIZE\n", __func__);
 		s5k4e1gx_ctrl->prev_res = S_FULL_SIZE;
 	}
 
 	/*switch PCLK and MCLK to Main cam*/
 	if (data && data->camera_clk_switch != NULL) {
-		pr_info("%s: switch clk\n", __func__);
+		pr_info("[CAM]%s: switch clk\n", __func__);
 		data->camera_clk_switch();
 		msleep(10);
 
 		/* Configure CAM GPIO ON (CAM_MCLK)*/
-		pr_info("%s msm_camio_probe_on()\n", __func__);
+		pr_info("[CAM]%s msm_camio_probe_on()\n", __func__);
 		msm_camio_probe_on(s5k4e1_pdev);
 	}
 
@@ -1543,7 +1544,7 @@ static int s5k4e1gx_sensor_open_init(struct msm_camera_sensor_info *data)
 	if (machine_is_saga() && !data->zero_shutter_mode) {
 		rc = s5k4e1gx_probe_init_sensor(data);
 		if (rc < 0)
-			printk("s5k4e1gx_sensor_open_init() call s5k4e1gx_probe_init_sensor() failed !!!\n");
+			printk("[CAM]s5k4e1gx_sensor_open_init() call s5k4e1gx_probe_init_sensor() failed !!!\n");
 	}
 
 
@@ -1564,7 +1565,7 @@ static int s5k4e1gx_sensor_open_init(struct msm_camera_sensor_info *data)
 	}
 
 	if (rc < 0) {
-		pr_err("s5k4e1gx_setting failed. rc = %d\n", rc);
+		pr_err("[CAM]s5k4e1gx_setting failed. rc = %d\n", rc);
 		goto init_fail1;
 	}
 
@@ -1630,10 +1631,10 @@ static int s5k4e1gx_sensor_release(void)
 
 	if (sdata->camera_clk_switch != NULL && sdata->cam_select_pin) {
 	/*0730: optical ask : CLK switch to Main Cam after 2nd Cam release*/
-	pr_info("%s: doing clk switch to Main CAM)\n", __func__);
+	pr_info("[CAM]%s: doing clk switch to Main CAM)\n", __func__);
 	rc = gpio_request(sdata->cam_select_pin, "s5k4e1gx");
 	if (rc < 0)
-		pr_err("GPIO (%d) request fail\n", sdata->cam_select_pin);
+		pr_err("[CAM]GPIO (%d) request fail\n", sdata->cam_select_pin);
 	else
 		gpio_direction_output(sdata->cam_select_pin, 0);
 	gpio_free(sdata->cam_select_pin);
@@ -1641,11 +1642,11 @@ static int s5k4e1gx_sensor_release(void)
 	msleep(5);
 	/* CLK switch set 0 */
 
-	pr_info("%s msm_camio_probe_off()\n", __func__);
+	pr_info("[CAM]%s msm_camio_probe_off()\n", __func__);
 	msm_camio_probe_off(s5k4e1_pdev);
 	}
 
-	pr_info("s5k4e1gx_release completed\n");
+	pr_info("[CAM]s5k4e1gx_release completed\n");
 	mutex_unlock(&s5k4e1gx_mutex);
 	return rc;
 }
@@ -1765,7 +1766,7 @@ static int32_t s5k4e1gx_write_exp_gain(uint16_t gain, uint32_t line)
 	struct s5k4e1gx_i2c_reg_conf tbl[3];
 
 	/*
-	printk("s5k4e1gx_write_exp_gain    gain=%d   line=%d\n", gain, line);
+	printk("[CAM]s5k4e1gx_write_exp_gain    gain=%d   line=%d\n", gain, line);
 	*/
 	if ((gain == 0) || (line == 0))
 		return rc;
@@ -1902,7 +1903,7 @@ static int32_t s5k4e1gx_video_config(int mode, int res)
 			if (rc < 0)
 				return rc;
 
-			pr_info("s5k4e1gx sensor configuration done!\n");
+			pr_info("[CAM]s5k4e1gx sensor configuration done!\n");
 		break;
 
 		case S_FULL_SIZE:
@@ -1945,7 +1946,7 @@ static int32_t s5k4e1gx_snapshot_config(int mode)
 static int32_t s5k4e1gx_raw_snapshot_config(int mode)
 {
 	int32_t rc = 0;
-       pr_info("s5k4e1gx_raw_snapshot_config\n");
+       pr_info("[CAM]s5k4e1gx_raw_snapshot_config\n");
 	rc = s5k4e1gx_setting(S_UPDATE_PERIODIC, S_RES_CAPTURE);
 	if (rc < 0)
 		return rc;
@@ -1967,14 +1968,14 @@ static int32_t s5k4e1gx_set_sensor_mode(int mode, int res)
 		break;
 
 	case SENSOR_SNAPSHOT_MODE:
-		pr_info("KPI PA: start sensor snapshot config\n");
+		pr_info("[CAM]KPI PA: start sensor snapshot config\n");
 		/* Check V-sync frame timer Start */
 		sinfo->kpi_sensor_start = ktime_to_ns(ktime_get());
 		rc = s5k4e1gx_snapshot_config(mode);
 		break;
 
 	case SENSOR_RAW_SNAPSHOT_MODE:
-		pr_info("KPI PA: start sensor raw snapshot config\n");
+		pr_info("[CAM]KPI PA: start sensor raw snapshot config\n");
 		sinfo->kpi_sensor_start = ktime_to_ns(ktime_get());
 		rc = s5k4e1gx_raw_snapshot_config(mode);
 		break;
@@ -2001,7 +2002,7 @@ static int32_t s5k4e1gx_go_to_position(uint32_t lens_pos,
 	buf[1] = code_val_lsb;
 	rc = s5k4e1gx_i2c_txdata(S5K4E1GX_AF_I2C_ADDR >> 1, buf, 2);
 	if (rc < 0)
-	pr_err("i2c_write failed, saddr = 0x%x addr = 0x%x, val =0x%x!\n",
+	pr_err("[CAM]i2c_write failed, saddr = 0x%x addr = 0x%x, val =0x%x!\n",
 		S5K4E1GX_AF_I2C_ADDR >> 1, buf[0], buf[1]);
 
 	return rc;
@@ -2125,7 +2126,7 @@ static int32_t s5k4e1gx_move_focus(int direction, int32_t num_steps)
 		if(curr_lens_pos != dest_lens_pos) {
 			rc = s5k4e1gx_go_to_position(dest_lens_pos, s5k4e1gx_mode_mask);
 			if (rc < 0) {
-				pr_err("s5k4e1gx_go_to_position Failed in Move Focus!!!\n");
+				pr_err("[CAM]s5k4e1gx_go_to_position Failed in Move Focus!!!\n");
 				return rc;
 			}
 			mdelay(s5k4e1gx_sw_damping_time_wait);
@@ -2133,7 +2134,7 @@ static int32_t s5k4e1gx_move_focus(int direction, int32_t num_steps)
 	} else {
 		rc = s5k4e1gx_go_to_position(dest_lens_pos, s5k4e1gx_mode_mask);
 		if (rc < 0) {
-			pr_err("s5k4e1gx_go_to_position Failed in Move Focus!!!\n");
+			pr_err("[CAM]s5k4e1gx_go_to_position Failed in Move Focus!!!\n");
 			return rc;
 		}
 	}
@@ -2150,13 +2151,13 @@ static int32_t s5k4e1gx_set_default_focus(void)
 	if (s5k4e1gx_ctrl->curr_step_pos != 0) {
 		rc = s5k4e1gx_move_focus(MOVE_FAR, s5k4e1gx_ctrl->curr_step_pos);
 		if (rc < 0) {
-			pr_err("s5k4e1gx_set_default_focus Failed!!!\n");
+			pr_err("[CAM]s5k4e1gx_set_default_focus Failed!!!\n");
 			return rc;
 		}
 	} else {
 		rc = s5k4e1gx_go_to_position(0, 0x02);
 		if (rc < 0) {
-			pr_err("s5k4e1gx_go_to_position Failed!!!\n");
+			pr_err("[CAM]s5k4e1gx_go_to_position Failed!!!\n");
 			return rc;
 		}
 	}
@@ -2293,7 +2294,7 @@ static int s5k4e1gx_sensor_config(void __user *argp)
 			s5k4e1gx_set_default_focus();
 		break;
 	case CFG_I2C_IOCTL_R_OTP:{
-		pr_info("Line:%d CFG_I2C_IOCTL_R_OTP \n", __LINE__);
+		pr_info("[CAM]Line:%d CFG_I2C_IOCTL_R_OTP \n", __LINE__);
 		rc = s5k4e1gx_i2c_read_fuseid(&cdata);
 		if (copy_to_user(argp, &cdata, sizeof(struct sensor_cfg_data)))
 			rc = -EFAULT;
@@ -2392,7 +2393,7 @@ static int s5k4e1gx_sysfs_init(void)
 	}
         ret = sysfs_create_file(android_s5k4e1gx, &dev_attr_node.attr);
 	if (ret) {
-		pr_info("s5k4e1gx_sysfs_init: dev_attr_node failed\n");
+		pr_info("[CAM]s5k4e1gx_sysfs_init: dev_attr_node failed\n");
 		ret = -EFAULT;
 		return ret;
 	}
@@ -2405,7 +2406,7 @@ static int s5k4e1gx_sensor_probe(struct msm_camera_sensor_info *info,
 		struct msm_sensor_ctrl *s)
 {
 	int rc = 0;
-	printk("s5k4e1gx_sensor_probe()\n");
+	printk("[CAM]s5k4e1gx_sensor_probe()\n");
 
 	rc = i2c_add_driver(&s5k4e1gx_i2c_driver);
 	if (rc < 0 || s5k4e1gx_client == NULL) {
@@ -2413,12 +2414,12 @@ static int s5k4e1gx_sensor_probe(struct msm_camera_sensor_info *info,
 		goto probe_fail;
 	}
 
-	pr_info("s5k4e1gx s->node %d\n", s->node);
+	pr_info("[CAM]s5k4e1gx s->node %d\n", s->node);
 	sensor_probe_node = s->node;
 
 	/*switch PCLK and MCLK to Main cam*/
 	if (info->camera_clk_switch != NULL) {
-		pr_info("s5k4e1gx: s5k4e1gx_sensor_probe: switch clk\n");
+		pr_info("[CAM]s5k4e1gx: s5k4e1gx_sensor_probe: switch clk\n");
 		info->camera_clk_switch();
 	}
 
@@ -2439,7 +2440,7 @@ static int s5k4e1gx_sensor_probe(struct msm_camera_sensor_info *info,
 	return rc;
 
 probe_fail:
-	pr_err("SENSOR PROBE FAILS!\n");
+	pr_err("[CAM]SENSOR PROBE FAILS!\n");
 	return rc;
 }
 
@@ -2449,10 +2450,10 @@ static int s5k4e1gx_vreg_enable(struct platform_device *pdev)
 {
 	struct msm_camera_sensor_info *sdata = pdev->dev.platform_data;
 	int rc;
-	pr_info("%s camera vreg on\n", __func__);
+	pr_info("[CAM]%s camera vreg on\n", __func__);
 
 	if (sdata->camera_power_on == NULL) {
-		pr_err("sensor platform_data didnt register\n");
+		pr_err("[CAM]sensor platform_data didnt register\n");
 		return -EIO;
 	}
 	rc = sdata->camera_power_on();
@@ -2466,7 +2467,7 @@ static int s5k4e1gx_vreg_disable(struct platform_device *pdev)
 	int rc;
 	printk(KERN_INFO "%s camera vreg off\n", __func__);
 	if (sdata->camera_power_off == NULL) {
-		pr_err("sensor platform_data didnt register\n");
+		pr_err("[CAM]sensor platform_data didnt register\n");
 		return -EIO;
 	}
 	rc = sdata->camera_power_off();
@@ -2477,11 +2478,11 @@ static int s5k4e1gx_vreg_disable(struct platform_device *pdev)
 static int __s5k4e1gx_probe(struct platform_device *pdev)
 {
 	int rc;
-	printk("__s5k4e1gx_probe\n");
+	printk("[CAM]__s5k4e1gx_probe\n");
 	s5k4e1_pdev = pdev;
 	rc = s5k4e1gx_vreg_enable(pdev);
 	if (rc < 0)
-		pr_err("__s5k4e1gx_probe fail sensor power on error\n");
+		pr_err("[CAM]__s5k4e1gx_probe fail sensor power on error\n");
 
 	return msm_camera_drv_start(pdev, s5k4e1gx_sensor_probe);
 }
@@ -2495,7 +2496,7 @@ static struct platform_driver msm_camera_driver = {
 
 static int __init s5k4e1gx_init(void)
 {
-	printk("s5k4e1gx_init\n");
+	printk("[CAM]s5k4e1gx_init\n");
 	return platform_driver_register(&msm_camera_driver);
 }
 

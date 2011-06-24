@@ -32,6 +32,21 @@ static int vpe_update_scaler(struct video_crop_t *pcrop);
 static struct vpe_device_type  vpe_device_data;
 static struct vpe_device_type  *vpe_device;
 struct vpe_ctrl_type    *vpe_ctrl;
+char *vpe_general_cmd[] = {
+	"VPE_DUMMY_0",  /* 0 */
+	"VPE_SET_CLK",
+	"VPE_RESET",
+	"VPE_START",
+	"VPE_ABORT",
+	"VPE_OPERATION_MODE_CFG",  /* 5 */
+	"VPE_INPUT_PLANE_CFG",
+	"VPE_OUTPUT_PLANE_CFG",
+	"VPE_INPUT_PLANE_UPDATE",
+	"VPE_SCALE_CFG_TYPE",
+	"VPE_ROTATION_CFG_TYPE",  /* 10 */
+	"VPE_AXI_OUT_CFG",
+	"VPE_CMD_DIS_OFFSET_CFG",
+};
 
 #define CHECKED_COPY_FROM_USER(in) {					\
 	if (copy_from_user((in), (void __user *)cmd->value,		\
@@ -213,6 +228,7 @@ void vpe_output_plane_config(uint32_t *p)
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_YSTRIDE1_OFFSET);
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_SIZE_OFFSET);
 	msm_io_w(*(++p), vpe_device->vpebase + VPE_OUT_XY_OFFSET);
+	vpe_ctrl->pcbcr_dis_offset = *(++p);
 }
 
 static int vpe_operation_config(uint32_t *p)
@@ -481,6 +497,11 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 	uint64_t numerator, denominator;
 	int32_t  zoom_dis_x, zoom_dis_y;
 
+	CDBG("%s: pcrop->in2_w = %d, pcrop->in2_h = %d\n", __func__,
+		 pcrop->in2_w, pcrop->in2_h);
+	CDBG("%s: pcrop->out2_w = %d, pcrop->out2_h = %d\n", __func__,
+		 pcrop->out2_w, pcrop->out2_h);
+
 	if ((pcrop->in2_w >= pcrop->out2_w) &&
 		(pcrop->in2_h >= pcrop->out2_h)) {
 		CDBG(" =======VPE no zoom needed, DIS is still enabled. \n");
@@ -514,12 +535,16 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 	zoom_dis_y = dis_offset->dis_offset_y *
 		pcrop->in2_h / pcrop->out2_h;
 
-	src_ROI_width = pcrop->in2_w - 2*zoom_dis_x;
-	src_ROI_height = pcrop->in2_h - 2*zoom_dis_y;
+	src_x = zoom_dis_x + (pcrop->out2_w-pcrop->in2_w)/2;
+	src_y = zoom_dis_y + (pcrop->out2_h-pcrop->in2_h)/2;
+
 
 
 	out_ROI_width = vpe_ctrl->out_w;
 	out_ROI_height = vpe_ctrl->out_h;
+
+	src_ROI_width = out_ROI_width * pcrop->in2_w / pcrop->out2_w;
+	src_ROI_height = out_ROI_height * pcrop->in2_h / pcrop->out2_h;
 
 	/* clamp to output size.  This is because along
 	processing, we mostly do truncation, therefore
@@ -527,12 +552,6 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 	smaller values.  The intention was to make sure that the
 	offset does not exceed margin.   But in the case it could
 	result src_roi bigger, due to subtract a smaller value. */
-	if (src_ROI_width > out_ROI_width)
-		src_ROI_width  = out_ROI_width;
-
-	if (src_ROI_height > out_ROI_height)
-		src_ROI_height  = out_ROI_height;
-
 	CDBG("src w = 0x%x, h=0x%x, dst w = 0x%x, h =0x%x.\n",
 		src_ROI_width, src_ROI_height, out_ROI_width,
 		out_ROI_height);
@@ -540,14 +559,6 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 	src_roi = (src_ROI_height << 16) + src_ROI_width;
 
 	msm_io_w(src_roi, vpe_device->vpebase + VPE_SRC_SIZE_OFFSET);
-
-	src_x = (out_ROI_width - src_ROI_width + 1)/2 - 1;
-	src_y = (out_ROI_height - src_ROI_height + 1)/2 - 1;
-
-	if (src_x < 0)
-		src_x = 0;
-	if (src_y < 0)
-		src_y = 0;
 
 	CDBG("src_x = %d, src_y=%d.\n", src_x, src_y);
 
@@ -705,6 +716,7 @@ static int vpe_update_scaler_with_dis(struct video_crop_t *pcrop,
 void msm_send_frame_to_vpe(uint32_t pyaddr, uint32_t pcbcraddr,
 				struct timespec *ts)
 {
+	uint32_t temp_pyaddr, temp_pcbcraddr;
 	CDBG("vpe input, pyaddr = 0x%x, pcbcraddr = 0x%x\n",
 		pyaddr, pcbcraddr);
 	msm_io_w(pyaddr, vpe_device->vpebase + VPE_SRCP0_ADDR_OFFSET);
@@ -714,8 +726,19 @@ void msm_send_frame_to_vpe(uint32_t pyaddr, uint32_t pcbcraddr,
 	else
 		vpe_ctrl->ts = *ts;
 
-	vpe_ctrl->state = 1;
+	if (vpe_ctrl->dis_en) {
+		/* Changing the VPE output CBCR address,
+		to make Y/CBCR continuous */
+		vpe_ctrl->pcbcr_before_dis = msm_io_r(vpe_device->vpebase +
+			VPE_OUTP1_ADDR_OFFSET);
+		temp_pyaddr = msm_io_r(vpe_device->vpebase +
+			VPE_OUTP0_ADDR_OFFSET);
+		temp_pcbcraddr = temp_pyaddr + vpe_ctrl->pcbcr_dis_offset;
+		msm_io_w(temp_pcbcraddr, vpe_device->vpebase +
+			VPE_OUTP1_ADDR_OFFSET);
+	}
 
+	vpe_ctrl->state = 1;
 	vpe_start();
 }
 
@@ -726,8 +749,8 @@ static int vpe_proc_general(struct msm_vpe_cmd *cmd)
 	struct msm_queue_cmd *qcmd = NULL;
 	struct msm_vpe_buf_info *vpe_buf;
 	struct msm_sync *sync = (struct msm_sync *)vpe_ctrl->syncdata;
-	CDBG("vpe_proc_general: cmdID = %d, length = %d\n",
-		cmd->id, cmd->length);
+	CDBG("vpe_proc_general: cmdID = %s, length = %d\n",
+		vpe_general_cmd[cmd->id], cmd->length);
 	switch (cmd->id) {
 	case VPE_RESET:
 	case VPE_ABORT:
@@ -822,20 +845,20 @@ static int vpe_proc_general(struct msm_vpe_cmd *cmd)
 		vpe_ctrl->dis_offset = *(struct dis_offset_type *)cmdp;
 		qcmd = msm_dequeue_vpe(&sync->vpe_q, list_vpe_frame);
 		if (!qcmd) {
-			pr_err("%s: no video frame.\n", __func__);
+			pr_err("[CAM]%s: no video frame.\n", __func__);
 			return -EAGAIN;
 		}
 		vdata = (struct msm_vfe_resp *)(qcmd->command);
 		vpe_buf = &vdata->vpe_bf;
 		vpe_update_scaler_with_dis(&(vpe_buf->vpe_crop),
 					&(vpe_ctrl->dis_offset));
-		msm_send_frame_to_vpe(vpe_buf->y_phy,
-						vpe_buf->cbcr_phy,
+
+		msm_send_frame_to_vpe(vpe_buf->y_phy, vpe_buf->cbcr_phy,
 						&(vpe_buf->ts));
 
-		if (!qcmd || !qcmd->on_heap)
-			return -1;
-		if (!--qcmd->on_heap)
+		if (!qcmd || !atomic_read(&qcmd->on_heap))
+			return -EAGAIN;
+		if (!atomic_sub_return(1, &qcmd->on_heap))
 			kfree(qcmd);
 		break;
 	}
@@ -910,8 +933,8 @@ void vpe_proc_ops(uint8_t id, void *msg, size_t len)
 		rp->type = VPE_MSG_GENERAL;
 		break;
 	}
-//	printk(KERN_ERR "%s: time = %ld\n",
-//			__func__, vpe_ctrl->ts.tv_nsec);
+	CDBG("%s: time = %ld\n",
+			__func__, vpe_ctrl->ts.tv_nsec);
 	vpe_ctrl->resp->vpe_resp(rp, MSM_CAM_Q_VPE_MSG,
 					vpe_ctrl->syncdata,
 					&(vpe_ctrl->ts), GFP_ATOMIC);
@@ -944,7 +967,7 @@ int msm_vpe_config(struct msm_vpe_cfg_cmd *cmd, void *data)
 	if (copy_from_user(&vpecmd,
 			(void __user *)(cmd->value),
 			sizeof(vpecmd))) {
-		pr_err("%s %d: copy_from_user failed\n", __func__,
+		pr_err("[CAM]%s %d: copy_from_user failed\n", __func__,
 				__LINE__);
 		return -EFAULT;
 	}
@@ -1026,6 +1049,9 @@ static void vpe_do_tasklet(unsigned long data)
 		pcbcraddr =
 			msm_io_r(vpe_device->vpebase + VPE_OUTP1_ADDR_OFFSET);
 
+		if (vpe_ctrl->dis_en)
+			pcbcraddr = vpe_ctrl->pcbcr_before_dis;
+
 		src_y =
 			msm_io_r(vpe_device->vpebase + VPE_SRCP0_ADDR_OFFSET);
 		src_cbcr =
@@ -1105,13 +1131,16 @@ int msm_vpe_open(void)
 
 	vpe_ctrl = kzalloc(sizeof(struct vpe_ctrl_type), GFP_KERNEL);
 	if (!vpe_ctrl) {
-		pr_err("%s: no memory!\n", __func__);
+		pr_err("[CAM]%s: no memory!\n", __func__);
 		return -ENOMEM;
 	}
 	/* don't change the order of clock and irq.*/
 	CDBG("%s: enable_clock \n", __func__);
-	vpe_clock_enable();
-
+#ifdef CONFIG_MSM_CAMERA_7X30
+	rc = vpe_clock_enable();
+#else
+	rc = msm_camio_vpe_clk_enable();
+#endif
 	CDBG("%s: enable_irq \n", __func__);
 	vpe_enable_irq();
 
@@ -1129,11 +1158,16 @@ int msm_vpe_release(void)
 	/* clean up....*/
 	/* drain the queue, etc. */
 	/* don't change the order of clock and irq.*/
+	int rc = 0;
 
 	CDBG("%s: In \n", __func__);
 
 	free_irq(vpe_device->vpeirq, 0);
-	vpe_clock_disable();
+#ifdef CONFIG_MSM_CAMERA_7X30
+	rc = vpe_clock_disable();
+#else
+	rc = msm_camio_vpe_clk_disable();
+#endif	
 	kfree(vpe_ctrl);
 
 	CDBG("%s: Out \n", __func__);
@@ -1155,20 +1189,20 @@ static int __msm_vpe_probe(struct platform_device *pdev)
 	/* does the device exist? */
 	vpeirq = platform_get_resource(pdev, IORESOURCE_IRQ, 0);
 	if (!vpeirq) {
-		pr_err("%s: no vpe irq resource.\n", __func__);
+		pr_err("[CAM]%s: no vpe irq resource.\n", __func__);
 		rc = -ENODEV;
 		goto vpe_free_device;
 	}
 	vpemem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!vpemem) {
-		pr_err("%s: no vpe mem resource!\n", __func__);
+		pr_err("[CAM]%s: no vpe mem resource!\n", __func__);
 		rc = -ENODEV;
 		goto vpe_free_device;
 	}
 	vpeio = request_mem_region(vpemem->start,
 			resource_size(vpemem), pdev->name);
 	if (!vpeio) {
-		pr_err("%s: VPE region already claimed.\n", __func__);
+		pr_err("[CAM]%s: VPE region already claimed.\n", __func__);
 		rc = -EBUSY;
 		goto vpe_free_device;
 	}
@@ -1177,7 +1211,7 @@ static int __msm_vpe_probe(struct platform_device *pdev)
 		ioremap(vpemem->start,
 				(vpemem->end - vpemem->start) + 1);
 	if (!vpebase) {
-		pr_err("%s: vpe ioremap failed.\n", __func__);
+		pr_err("[CAM]%s: vpe ioremap failed.\n", __func__);
 		rc = -ENOMEM;
 		goto vpe_release_mem_region;
 	}

@@ -1,5 +1,5 @@
 #
-# Makefile for the touchscreen drivers.
+# Makefile for the opticaljoystick drivers.
 #
 
 # Each configuration option enables a list of files.

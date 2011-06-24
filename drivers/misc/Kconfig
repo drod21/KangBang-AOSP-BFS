@@ -305,6 +305,22 @@ config ISL29003
 	  This driver can also be built as a module.  If so, the module
 	  will be called isl29003.
 
+config SENSORS_TSL2550
+	tristate "Taos TSL2550 ambient light sensor"
+	depends on I2C && SYSFS
+	help
+	  If you say yes here you get support for the Taos TSL2550
+	  ambient light sensor.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called tsl2550.
+
+config VP_A1026
+	tristate "A1026 Voice Processor Driver"
+	depends on I2C
+	help
+	  A1026 Voice Processor Driver implemented by HTC.
+
 config EP93XX_PWM
 	tristate "EP93xx PWM support"
 	depends on ARCH_EP93XX
@@ -381,6 +397,46 @@ config APANIC_PLABEL
 	 If your platform uses a different flash partition label for storing
  	 crashdumps, enter it here.
 
+config TSIF
+	depends on ARCH_MSM
+	tristate "TSIF (Transport Stream InterFace) support"
+	default n
+	---help---
+	  This driver supports low level TSIF interface. It provides API
+	  for upper layer drivers. If you have a TSIF hardware, say
+	  Y here and read <file:Documentation/arm/msm/tsif.txt>.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called msm_tsif.
+
+config TSIF_CHRDEV
+	tristate "TSIF character device"
+	depends on TSIF
+	default n
+	---help---
+	  This driver uses low level TSIF interface. It provides character
+	  device useable from user space programs: one can read TSIF stream
+	  from this device.
+
+	  This driver may be used as example for TSIF API usage.
+
+	  To compile this driver as module, choose M here: the
+	  module will be called tsif_chrdev.
+
+config TSIF_DEBUG
+	bool "Turn on debugging information for tsif driver"
+	depends on TSIF
+	default n
+	---help---
+	  This turns on debugging information for the tsif driver
+
+config HAPTIC_ISA1200
+	tristate "ISA1200 haptic support"
+	depends on I2C
+	default n
+	help
+	  The ISA1200 is a high performance enhanced haptic driver.
+
 config PMIC8058_PWM
         tristate "Qualcomm PM8058 PWM support"
         depends on PMIC8058
@@ -390,6 +446,14 @@ config PMIC8058_PWM
           on Qualcomm PM8058 chip. Pulse Width Modulation is used for
           purposes including software controlled brightness of backlight,
           motor control, and waveform generation.
+
+config PMIC8058_VIBRATOR
+	tristate "Qualcomm PM8058 vibrator support"
+	depends on PMIC8058 && ANDROID_TIMED_OUTPUT
+	default n
+	help
+	  This option enables device driver support for the vibrator
+	  on Qualcomm PM8058 chip.
 
 config SENSORS_BMA150_SPI
         tristate "BMA150 G-sensor Driver"
@@ -406,10 +470,56 @@ config PMIC8058_NFC
 	  Qualcomm PM8058 chip has a module to support NFC (Near Field
 	  Communication). This option enables the driver to support it.
 
+config PMIC8058_UPL
+	tristate "Qualcomm PM8058 support for User Programmable Logic"
+	depends on PMIC8058
+	default n
+	help
+	  This option enables device driver support for User Programmable Logic
+	  on Qualcomm PM8058 chip.  The UPL module provides a means to implement
+	  simple truth table based logic via a set of control registers. I/O may
+	  be routed in and out of the UPL module via GPIO or DTEST pins.
+
+config PMIC8058_XOADC
+	tristate "Qualcomm PM8058 XOADC driver"
+	depends on PMIC8058
+	default n
+	help
+	  Enables User processor ADC reads over the XOADC module of Qualcomm's
+	  PMIC8058. Driver interface to program registers of the ADC over
+	  AMUX channels, devices on programmable MPP's and xotherm.
+
+config PMIC8058_MISC
+	tristate "Qualcomm PM8058 Misc Device driver"
+	depends on PMIC8058
+	default n
+	help
+	  Provides functionality for various small drivers utilizing the
+	  Qualcomm PM8058 chip.  Examples include: signalling when the 32kHz
+	  oscillator malfunctions.
+
+config CABLE_DETECT_8X60
+        boolean "Cable detect driver"
+        depends on ARCH_MSM8X60
+        default n
+        help
+          Detect usb, ac and other accessories.
+
+config CABLE_DETECT_ACCESSORY
+        boolean "CABLE ACCESSORY DETECT"
+        depends on CABLE_DETECT_8X60
+        default n
+
+config CABLE_DETECT_ACCESSORY_BY_ADC
+        boolean "DETECT ACCESSORY BY PMIC ADC"
+        depends on CABLE_DETECT_8X60 && CABLE_DETECT_ACCESSORY
+        default n
+
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"
 source "drivers/misc/cb710/Kconfig"
 source "drivers/misc/iwmc3200top/Kconfig"
 source "drivers/misc/video_core/720p/Kconfig"
+source "drivers/misc/mpu3050/Kconfig"
 
 endif # MISC_DEVICES

@@ -75,6 +75,7 @@
 
 #include <linux/msm_mdp.h>
 #include <mach/msm_fb.h>
+#include <mach/debug_display.h>
 
 #include "mdp_hw.h"
 #include "mdp4.h"
@@ -177,6 +178,7 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 	uint32_t mddi_ld_param;
 	uint16_t mddi_vdo_packet_reg;
 	struct mdp4_overlay_pipe *pipe = NULL;
+	int data;
 
 	mddi_mdp = mdp;		/* keep it */
 
@@ -204,6 +206,16 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 		mddi_ld_param = 0;
 
 		mddi_vdo_packet_reg = MDDI_VDO_PACKET_PRIM;
+		if (mdp->hw_version >= MDP4_REVISION_V2_1) {
+			data = mdp_readl(mdp, MDP_AXI_RDMASTER_CONFIG);
+                        data &= ~0x0300;        /* bit 8, 9, MASTER4 */
+                        if (width == 540) /* qHD, 540x960 */
+                                data |= 0x0200;
+                        else
+                                data |= 0x0100;
+
+			mdp_writel(mdp, data, MDP_AXI_RDMASTER_CONFIG);
+		}
 
 /*     FIXME: currently we use only one display
 
@@ -217,7 +229,10 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 		}
 */
 		mdp_writel(mdp, mddi_ld_param, 0x00090);
-		mdp_writel(mdp, (MDDI_VDO_PACKET_DESC_RGB565 << 16) | mddi_vdo_packet_reg, 0x00094);
+		if ( mdp->mdp_dev.color_format == MSM_MDP_OUT_IF_FMT_RGB888 )
+			mdp_writel(mdp, (MDDI_VDO_PACKET_DESC_RGB888 << 16) | mddi_vdo_packet_reg, 0x00094);
+		else
+			mdp_writel(mdp, (MDDI_VDO_PACKET_DESC_RGB565 << 16) | mddi_vdo_packet_reg, 0x00094);
 		mdp_writel(mdp, 0x01, 0x00098);
 	} else {
 		pipe = mddi_pipe;
@@ -234,7 +249,7 @@ void mdp4_overlay_update_lcd(struct mdp_info *mdp, uint32_t addr, uint32_t strid
 	pipe->dst_y = 0;
 	pipe->dst_x = 0;
 	pipe->srcp0_addr = (uint32_t)addr;
-	pipe->srcp0_ystride = stride;
+	pipe->srcp0_ystride = (stride + 31) & ~31;
 
 	pipe->mixer_stage  = MDP4_MIXER_STAGE_BASE;
 
@@ -307,8 +322,8 @@ void mdp4_mddi_overlay(void *priv, uint32_t addr, uint32_t stride,
         struct mdp_info *mdp = priv;
 
 #ifdef CONFIG_FB_MSM_WRITE_BACK
-	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
-
+	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
+		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		mdp4_overlay_update_lcd(mdp, addr, stride, width, height, x, y);
 
 		if(mdp4_overlay_active(mdp, MDP4_MIXER0) > 1){
@@ -330,7 +345,8 @@ void mdp4_mddi_overlay(void *priv, uint32_t addr, uint32_t stride,
 		mdp4_mddi_overlay_kickoff(mdp, mddi_pipe);
 	}
 #else
-	if (mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
+	if (mdp->hw_version < MDP4_REVISION_V2_1 &&
+		mdp->mdp_dev.overrides & MSM_MDP4_MDDI_DMA_SWITCH) {
 		mdp4_overlay_update_lcd(mdp, addr, stride, width, height, x, y);
 		if(mdp4_overlay_active(mdp, MDP4_MIXER0) > 1)
 			mdp4_mddi_overlay_kickoff(mdp, mddi_pipe);

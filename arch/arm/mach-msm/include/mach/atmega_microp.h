@@ -35,6 +35,7 @@
 #define MICROP_FUNCTION_REMOTEKEY	2
 #define MICROP_FUNCTION_LCD_BL		3
 #define MICROP_FUNCTION_RMK_VALUE	4
+#define MICROP_FUNCTION_KEY		5
 #define MICROP_FUNCTION_INTR		11
 #define MICROP_FUNCTION_GSENSOR		12
 #define MICROP_FUNCTION_LED		13
@@ -55,6 +56,7 @@
 #define LED_PWM					(1 << 3)
 #define LED_WIMAX				(1 << 4)
 #define LED_MOBEAM				(1 << 5)
+#define LED_SKEY				(1 << 6)
 
 #define SPI_GSENSOR				(1 << 0)
 #define SPI_LCM					(1 << 1)
@@ -115,6 +117,7 @@
 #define MICROP_I2C_RCMD_GPI_INT_SETTING		0x85
 #define MICROP_I2C_RCMD_REMOTE_KEYCODE		0x87
 #define MICROP_I2C_WCMD_REMOTE_KEY_DEBN_TIME	0x88
+#define MICROP_I2C_RCMD_AP_KEY_CODE		0x89
 #define MICROP_I2C_WCMD_REMOTE_PLUG_DEBN_TIME	0x89
 #define MICROP_I2C_WCMD_SIMCARD_DEBN_TIME	0x8A
 #define MICROP_I2C_WCMD_GPO_LED_STATUS_EN	0x90
@@ -180,6 +183,7 @@ struct microp_int_pin {
 	uint16_t int_sdcard;
 	uint16_t int_oj;
 	uint16_t int_psensor;
+	uint16_t int_appkey;
 };
 
 struct microp_gpio_status {

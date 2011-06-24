@@ -212,12 +212,12 @@ get_next_ucode(int cpu, const u8 *buf, unsigned int size, unsigned int *mc_size)
 
 	mc = vmalloc(actual_size);
 	if (!mc)
- 		return NULL;
+		return NULL;
 
 	memset(mc, 0, actual_size);
 	get_ucode_data(mc, buf + UCODE_CONTAINER_SECTION_HDR, actual_size);
 	*mc_size = actual_size + UCODE_CONTAINER_SECTION_HDR;
-	
+
 	return mc;
 }
 

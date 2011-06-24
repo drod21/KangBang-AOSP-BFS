@@ -23,6 +23,7 @@
 #include <linux/gpio.h>
 #include <linux/slab.h>
 #include <mach/msm_fb.h>
+#include <mach/debug_display.h>
 
 static DECLARE_WAIT_QUEUE_HEAD(nt35399_vsync_wait);
 
@@ -64,7 +65,7 @@ static void nt35399_wait_vsync(struct msm_panel_data *panel_data)
 
 	if (wait_event_timeout(nt35399_vsync_wait, panel->nt35399_got_int,
 				HZ/2) == 0)
-		printk(KERN_ERR "timeout waiting for VSYNC\n");
+		PR_DISP_ERR("timeout waiting for VSYNC\n");
 
 	panel->nt35399_got_int = 0;
 	/* interrupt clears when screen dma starts */
@@ -82,7 +83,7 @@ static int nt35399_suspend(struct msm_panel_data *panel_data)
 
 	ret = bridge_data->uninit(bridge_data, client_data);
 	if (ret) {
-		printk(KERN_INFO "mddi nt35399 client: non zero return from "
+		PR_DISP_INFO("mddi nt35399 client: non zero return from "
 			"uninit\n");
 		return ret;
 	}
@@ -172,7 +173,7 @@ static int setup_vsync(struct panel_info *panel, int init)
 	if (ret)
 		goto err_request_irq_failed;
 
-	printk(KERN_INFO "vsync on gpio %d now %d\n",
+	PR_DISP_INFO("vsync on gpio %d now %d\n",
 	       gpio, gpio_get_value(gpio));
 	return 0;
 
@@ -197,7 +198,7 @@ static int mddi_nt35399_probe(struct platform_device *pdev)
 	struct panel_info *panel = kzalloc(sizeof(struct panel_info),
 					   GFP_KERNEL);
 
-	printk(KERN_DEBUG "%s: enter.\n", __func__);
+	PR_DISP_DEBUG( "%s: enter.\n", __func__);
 
 	if (!panel)
 		return -ENOMEM;

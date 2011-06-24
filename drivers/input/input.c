@@ -178,6 +178,26 @@ static void input_stop_autorepeat(struct input_dev *dev)
 	del_timer(&dev->timer);
 }
 
+static void input_send_ats_message(unsigned int code, int value)
+{
+	if (!value)
+		return;
+
+	switch (code) {
+	case KEY_VOLUMEUP:
+		pr_info("[ATS][volume_up][successful]\n");
+		break;
+
+	case KEY_VOLUMEDOWN:
+		pr_info("[ATS][volume_down][successful]\n");
+		break;
+
+	case KEY_BACK:
+		pr_info("[ATS][press_back][complete]\n");
+		break;
+	}
+}
+
 #define INPUT_IGNORE_EVENT	0
 #define INPUT_PASS_TO_HANDLERS	1
 #define INPUT_PASS_TO_DEVICE	2
@@ -219,6 +239,8 @@ static void input_handle_event(struct input_dev *dev,
 					input_start_autorepeat(dev, code);
 				else
 					input_stop_autorepeat(dev);
+
+				input_send_ats_message(code, value);
 			}
 
 			disposition = INPUT_PASS_TO_HANDLERS;

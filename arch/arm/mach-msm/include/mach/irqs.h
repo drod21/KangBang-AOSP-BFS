@@ -17,6 +17,16 @@
 #ifndef __ASM_ARCH_MSM_IRQS_H
 #define __ASM_ARCH_MSM_IRQS_H
 
+#if defined(CONFIG_ARCH_MSM8X60)
+#include "irqs-8x60.h"
+
+#define NR_IRQS (NR_MSM_IRQS + NR_GPIO_IRQS + NR_BOARD_IRQS)
+#define MSM_GPIO_TO_INT(n) (NR_MSM_IRQS + (n))
+#define FIRST_GPIO_IRQ MSM_GPIO_TO_INT(0)
+#define MSM_INT_TO_REG(base, irq) (base + irq / 32)
+
+#else
+
 #if defined(CONFIG_ARCH_MSM_ARM11)
 
 /* MSM ARM11 Interrupt Numbers */
@@ -347,4 +357,6 @@
 
 extern void register_msm_irq_mask(unsigned int irq);
 extern void unregister_msm_irq_mask(unsigned int irq);
+
+#endif
 #endif

@@ -79,7 +79,7 @@ typedef struct {
 		spin_unlock_irqrestore(&((lock)->local), flags); \
 	} while (0)
 
-#if defined(CONFIG_ARCH_MSM7X30)
+#if defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60)
 typedef struct {
 	struct mutex local;
 	_remote_mutex_t remote;

@@ -134,6 +134,22 @@ config TPS6507X
 	  This driver can also be built as a module.  If so, the module
 	  will be called tps6507x.
 
+config PMIC8058
+	tristate "PMIC8058 Power Management chip"
+	depends on I2C_SSBI && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	default y if I2C_SSBI && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	select MFD_CORE
+	help
+	  Say yes here for Qualcomm PM8058 chip.
+
+config PMIC8901
+	tristate "PMIC8901 Power Management chip"
+	depends on I2C_SSBI && ARCH_MSM8X60
+	default y if I2C_SSBI && ARCH_MSM8X60
+	select MFD_CORE
+	help
+	  Say yes here for Qualcomm PM8901 chip.
+
 config MENELAUS
 	bool "Texas Instruments TWL92330/Menelaus PM chip"
 	depends on I2C=y && ARCH_OMAP2
@@ -173,7 +189,7 @@ config TWL4030_POWER
 
 config MARIMBA_CORE
 	tristate "Marimba Core"
-	depends on I2C && ARCH_MSM7X30
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60)
 	default n
 	help
 	  Enables the Marimba Core driver. The core driver provides
@@ -187,6 +203,23 @@ config MARIMBA_CODEC
 	help
 	 This driver programs Marimba Wideband Codec for input/output of
 	 audio signal.
+
+config TIMPANI_CODEC
+	tristate "Timpani Codec"
+	depends on MARIMBA_CORE
+	default n
+	help
+	 This driver programs Timpani Wideband Codec for input/output of
+	 audio signal.
+
+config BAHAMA_CORE
+	tristate "Bahama Core"
+	depends on I2C && (ARCH_MSM7X30 || ARCH_MSM8X60)
+	default n
+	help
+	  Enables the Bahama Core driver. The core driver provides
+	  read/write capability to registers which are part of the
+	  Bahama core.
 
 config TWL4030_CODEC
 	bool
@@ -509,7 +542,7 @@ config PMIC8058
 
 config MARIMBA_TSADC
 	tristate "Support for Marimba Touchscreen ADC"
-	depends on MARIMBA_CORE
+	depends on MARIMBA_CORE && ARCH_MSM7X30
 	default y if MARIMBA_CORE
 	help
 	  Say yes here if you want to include support for TSADC in the

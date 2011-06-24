@@ -1044,8 +1044,8 @@ static int mtp_function_setup(struct usb_function *f,
 	unsigned long	flags;
 
 	/* do nothing if we are disabled */
-//	if (dev->function.disabled)
-//		return value;
+	if (dev->function.disabled)
+		return value;
 
 	VDBG(cdev, "mtp_function_setup "
 			"%02x.%02x v%04x i%04x l%u\n",

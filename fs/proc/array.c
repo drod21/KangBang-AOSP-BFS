@@ -515,7 +515,7 @@ static int do_task_stat(struct seq_file *m, struct pid_namespace *ns,
 #ifdef CONFIG_SCHEDSTATS
 		nsec_to_clock_t(task->se.statistics.iowait_sum)
 #else
-		0UL
+		(unsigned long long)0UL
 #endif
 	);
 

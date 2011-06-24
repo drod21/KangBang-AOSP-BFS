@@ -67,6 +67,22 @@ static unsigned int msmsdcc_piopoll = 1;
 static unsigned int msmsdcc_sdioirq = 1;
 static unsigned long msmsdcc_irqtime;
 
+#define DUMMY_52_STATE_NONE		0
+#define DUMMY_52_STATE_SENT		1
+
+static struct mmc_command dummy52cmd;
+static struct mmc_request dummy52mrq = {
+	.cmd = &dummy52cmd,
+	.data = NULL,
+	.stop = NULL,
+};
+static struct mmc_command dummy52cmd = {
+	.opcode = SD_IO_RW_DIRECT,
+	.flags = MMC_RSP_PRESENT,
+	.data = NULL,
+	.mrq = &dummy52mrq,
+};
+
 #define PIO_SPINMAX 30
 #define CMD_SPINMAX 20
 
@@ -173,33 +189,18 @@ msmsdcc_disable_clocks(struct msmsdcc_host *host, int deferr)
 			return;
 
 	if (is_wimax_platform(host->plat) && mmc_wimax_get_status()) {
-		if (host->curr.mrq) {
-			printk("%s [WiMAX] %s curr.mrq != NULL", __func__, mmc_hostname(host->mmc));
-			return;
-		}
-
 		if (!host->clks_on) {
 			printk("%s [WiMAX] %s clks_on is OFF", __func__, mmc_hostname(host->mmc));
 			return;
 		}
 	}
 
-	if (is_sd_platform(host->plat) && host->curr.mrq) {
-		printk("%s [SD] curr.mrq != NULL", __func__);
-		return;
-	}
-
-	if (is_mmc_platform(host->plat) && host->curr.mrq) {
-		printk("%s [eMMC] curr.mrq != NULL", __func__);
+	if (host->curr.mrq) {
+		printk("%s: curr.mrq != NULL", mmc_hostname(host->mmc));
 		return;
 	}
 
 	WARN_ON(!host->clks_on);
-
-	if (host->curr.mrq)
-		printk("%s call %s()", mmc_hostname(host->mmc), __func__);
-
-	BUG_ON(host->curr.mrq);
 
 	if (is_wimax_platform(host->plat) && mmc_wimax_get_status()) {
 		if (!mmc_wimax_get_busclk_pwrsave())
@@ -345,9 +346,9 @@ static void msmsdcc_reset_and_restore(struct msmsdcc_host *host)
 	if (ret)
 		pr_err("%s: Clock deassert failed at %u Hz with err %d\n",
 				mmc_hostname(host->mmc), host->clk_rate, ret);
-
+#ifndef CONFIG_SDIO_CES
 	pr_info("%s: Controller has been reset\n", mmc_hostname(host->mmc));
-
+#endif
 	/* Restore the contoller state */
 	writel(host->pwr, host->base + MMCIPOWER);
 	writel(mci_clk, host->base + MMCICLOCK);
@@ -455,10 +456,6 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 		goto out;
 	}
 
-	if (mrq->data->error == -EFAULT) {
-		msmsdcc_reset_and_restore(host);
-		mrq->data->error = -EIO;
-	}
 	if (host->dma.result & DMOV_RSLT_DONE) {
 		host->curr.data_xfered = host->curr.xfer_size;
 	} else {
@@ -466,17 +463,17 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 		if (host->dma.result & DMOV_RSLT_ERROR)
 			pr_err("%s: DMA error (0x%.8x)\n",
 			       mmc_hostname(host->mmc), host->dma.result);
+#ifndef CONFIG_SDIO_CES
 		if (host->dma.result & DMOV_RSLT_FLUSH)
 			pr_err("%s: DMA channel flushed (0x%.8x)\n",
 			       mmc_hostname(host->mmc), host->dma.result);
-		if (host->dma.err) {
-			pr_err("Flush data: %.8x %.8x %.8x %.8x %.8x %.8x\n",
-			       host->dma.err->flush[0], host->dma.err->flush[1],
-			       host->dma.err->flush[2], host->dma.err->flush[3],
-			       host->dma.err->flush[4],
-			       host->dma.err->flush[5]);
-			msmsdcc_reset_and_restore(host);
-		}
+		pr_err("Flush data: %.8x %.8x %.8x %.8x %.8x %.8x\n",
+		       host->dma.err.flush[0], host->dma.err.flush[1],
+		       host->dma.err.flush[2], host->dma.err.flush[3],
+		       host->dma.err.flush[4],
+		       host->dma.err.flush[5]);
+#endif
+		msmsdcc_reset_and_restore(host);
 		if (!mrq->data->error)
 			mrq->data->error = -EIO;
 	}
@@ -497,8 +494,10 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 	if (host->curr.got_dataend || mrq->data->error) {
 
 		if (mrq->data->error && !(host->curr.got_dataend)) {
+#ifndef CONFIG_SDIO_CES
 			pr_info("%s: Worked around bug 1535304\n",
 			       mmc_hostname(host->mmc));
+#endif
 		}
 		/*
 		 * If we've already gotten our DATAEND / DATABLKEND
@@ -516,16 +515,6 @@ msmsdcc_dma_complete_tlet(unsigned long data)
 			spin_unlock_irqrestore(&host->lock, flags);
 #if BUSCLK_PWRSAVE
 			msmsdcc_disable_clocks(host, 1);
-#endif
-#ifdef CONFIG_MMC_MSM_PROG_DONE_SCAN
-			if ((mrq->cmd->opcode == SD_IO_RW_EXTENDED)
-				&& (mrq->cmd->arg & 0x80000000)) {
-				/* set the prog_scan in a cmd53.*/
-				host->prog_scan = 1;
-				/* Send STOP to let the SDCC know to stop. */
-				writel(MCI_CSPM_MCIABORT,
-						host->base + MMCICOMMAND);
-			}
 #endif
 			mmc_request_done(host->mmc, mrq);
 			return;
@@ -548,7 +537,8 @@ msmsdcc_dma_complete_func(struct msm_dmov_cmd *cmd,
 	struct msmsdcc_host *host = dma_data->host;
 
 	dma_data->result = result;
-	dma_data->err = err;
+	if (err)
+		memcpy(&dma_data->err, err, sizeof(struct msm_dmov_errdata));
 
 	tasklet_schedule(&host->dma_tlet);
 }
@@ -704,6 +694,12 @@ msmsdcc_start_command_deferred(struct msmsdcc_host *host,
 	      (cmd->opcode == 53))
 		*c |= MCI_CSPM_DATCMD;
 
+	if (is_svlte_platform(host->plat) && host->prog_scan
+		&& (cmd->opcode == 12)) {
+		*c |= MCI_CPSM_PROGENA;
+		host->prog_enable = 1;
+	}
+
 	if (cmd == cmd->mrq->stop)
 		*c |= MCI_CSPM_MCIABORT;
 
@@ -774,6 +770,8 @@ msmsdcc_start_data(struct msmsdcc_host *host, struct mmc_data *data,
 		}
 		dsb();
 		msm_dmov_enqueue_cmd_ext(host->dma.channel, &host->dma.hdr);
+		if (data->flags & MMC_DATA_WRITE)
+			host->prog_scan = 1;
 	} else {
 		msmsdcc_writel(host, timeout, MMCIDATATIMER);
 
@@ -825,12 +823,14 @@ msmsdcc_data_err(struct msmsdcc_host *host, struct mmc_data *data,
 	if (status & MCI_DATACRCFAIL) {
 		if (!(data->mrq->cmd->opcode == MMC_BUSTEST_W
 			|| data->mrq->cmd->opcode == MMC_BUSTEST_R)) {
+#ifndef CONFIG_SDIO_CES
 			pr_err("%s: Data CRC error\n",
 			       mmc_hostname(host->mmc));
 			pr_err("%s: opcode 0x%.8x\n", __func__,
 			       data->mrq->cmd->opcode);
 			pr_err("%s: blksz %d, blocks %d\n", __func__,
 			       data->blksz, data->blocks);
+#endif
 			data->error = -EILSEQ;
 		}
 	} else if (status & MCI_DATATIMEOUT) {
@@ -1074,7 +1074,9 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 		cmd->error = -ETIMEDOUT;
 	} else if (status & MCI_CMDCRCFAIL &&
 		   cmd->flags & MMC_RSP_CRC) {
+#ifndef CONFIG_SDIO_CES
 		pr_err("%s: Command CRC error\n", mmc_hostname(host->mmc));
+#endif
 		cmd->error = -EILSEQ;
 	}
 
@@ -1085,8 +1087,22 @@ static void msmsdcc_do_cmdirq(struct msmsdcc_host *host, uint32_t status)
 		else if (host->curr.data) { /* Non DMA */
 			msmsdcc_stop_data(host);
 			msmsdcc_request_end(host, cmd->mrq);
-		} else /* host->data == NULL */
-			msmsdcc_request_end(host, cmd->mrq);
+		} else { /* host->data == NULL */
+			if (!cmd->error && host->prog_enable) {
+				if (status & MCI_PROGDONE) {
+					host->prog_scan = 0;
+					host->prog_enable = 0;
+					msmsdcc_request_end(host, cmd->mrq);
+				} else
+					host->curr.cmd = cmd;
+			} else {
+				if (host->prog_enable) {
+					host->prog_scan = 0;
+					host->prog_enable = 0;
+				}
+				msmsdcc_request_end(host, cmd->mrq);
+			}
+		}
 	} else if (cmd->data)
 		if (!(cmd->data->flags & MMC_DATA_READ))
 			msmsdcc_start_data(host, cmd->data,
@@ -1100,7 +1116,7 @@ msmsdcc_handle_irq_data(struct msmsdcc_host *host, u32 status,
 	struct mmc_data *data = host->curr.data;
 
 	if (status & (MCI_CMDSENT | MCI_CMDRESPEND | MCI_CMDCRCFAIL |
-	              MCI_CMDTIMEOUT) && host->curr.cmd) {
+				MCI_CMDTIMEOUT | MCI_PROGDONE) && host->curr.cmd) {
 		msmsdcc_do_cmdirq(host, status);
 	}
 
@@ -1207,6 +1223,30 @@ msmsdcc_irq(int irq, void *dev_id)
 		if (!status)
 			break;
 
+		if ((host->plat->dummy52_required) &&
+		    (host->dummy_52_state == DUMMY_52_STATE_SENT)) {
+			if (status & (MCI_PROGDONE | MCI_CMDCRCFAIL |
+					MCI_CMDTIMEOUT)) {
+				struct mmc_request *mrq = host->curr.mrq;
+				if (status & MCI_CMDTIMEOUT)
+					pr_debug("%s: dummy CMD52 timeout\n",
+						mmc_hostname(host->mmc));
+				if (status & MCI_CMDCRCFAIL)
+					pr_debug("%s: dummy CMD52 CRC failed\n",
+						mmc_hostname(host->mmc));
+				host->dummy_52_state = DUMMY_52_STATE_NONE;
+				host->curr.cmd = NULL;
+				spin_unlock(&host->lock);
+				if (mrq->data && mrq->data->flags & MMC_DATA_READ)
+					/* Queue/read data, daisy-chain command when data starts */
+					msmsdcc_start_data(host, mrq->data, mrq->cmd, 0);
+				else
+					msmsdcc_start_command(host, mrq->cmd, 0);
+				return IRQ_HANDLED;
+			}
+			break;
+		}
+
 		msmsdcc_handle_irq_data(host, status, base);
 
 		if (status & MCI_SDIOINTOPER) {
@@ -1265,6 +1305,27 @@ msmsdcc_request(struct mmc_host *mmc, struct mmc_request *mrq)
 
 	host->curr.mrq = mrq;
 
+	if (host->plat->dummy52_required) {
+		if (host->dummy_52_needed) {
+			host->dummy_52_state = DUMMY_52_STATE_SENT;
+			msmsdcc_start_command(host, &dummy52cmd,
+					      MCI_CPSM_PROGENA);
+			spin_unlock_irqrestore(&host->lock, flags);
+			if (mrq->data && mrq->data->flags == MMC_DATA_WRITE) {
+				if (mrq->cmd->opcode == SD_IO_RW_EXTENDED ||
+					mrq->cmd->opcode == 54)
+					host->dummy_52_needed = 1;
+			} else {
+				host->dummy_52_needed = 0;
+			}
+			return;
+		}
+		if (mrq->data && mrq->data->flags == MMC_DATA_WRITE) {
+			if (mrq->cmd->opcode == SD_IO_RW_EXTENDED ||
+				mrq->cmd->opcode == 54)
+				host->dummy_52_needed = 1;
+		}
+	}
 	if (mrq->data && mrq->data->flags & MMC_DATA_READ)
 		/* Queue/read data, daisy-chain command when data starts */
 		msmsdcc_start_data(host, mrq->data, mrq->cmd, 0);
@@ -1411,7 +1472,7 @@ msmsdcc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 	}
 	spin_unlock_irqrestore(&host->lock, flags);
 }
-
+#ifdef CONFIG_MACH_MECHA
 void msmsdcc_dumpreg(struct mmc_host *mmc)
 {
         int i;
@@ -1420,7 +1481,7 @@ void msmsdcc_dumpreg(struct mmc_host *mmc)
                 pr_info("%s: reg 0x%x: 0x%x\n", mmc_hostname(mmc),
                         i, readl(host->base + i));
 }
-
+#endif
 int msmsdcc_set_pwrsave(struct mmc_host *mmc, int pwrsave)
 {
 	struct msmsdcc_host *host = mmc_priv(mmc);
@@ -1446,11 +1507,13 @@ static void msmsdcc_enable_sdio_irq(struct mmc_host *mmc, int enable)
 	spin_lock_irqsave(&host->lock, flags);
 	if (msmsdcc_sdioirq == 1) {
 		status = msmsdcc_readl(host, MMCIMASK0);
-		if (enable)
+		if (enable) {
 			status |= MCI_SDIOINTOPERMASK;
-		else
+			host->saved_irq0mask |= MCI_SDIOINTOPERMASK;
+		} else {
 			status &= ~MCI_SDIOINTOPERMASK;
-		host->saved_irq0mask = status;
+			host->saved_irq0mask &= ~MCI_SDIOINTOPERMASK;
+		}
 		msmsdcc_writel(host, status, MMCIMASK0);
 	}
 	spin_unlock_irqrestore(&host->lock, flags);
@@ -1568,8 +1631,14 @@ msmsdcc_init_dma(struct msmsdcc_host *host)
 	host->dma.cmd_busaddr = host->dma.nc_busaddr;
 	host->dma.cmdptr_busaddr = host->dma.nc_busaddr +
 				offsetof(struct msmsdcc_nc_dmadata, cmdptr);
+#if defined(CONFIG_ARCH_MSM7X30)
+	if (is_mmc_platform(host->plat))
+		host->dma.channel = DMOV_NAND_CHAN;
+	else
+		host->dma.channel = host->dmares->start;
+#else
 	host->dma.channel = host->dmares->start;
-
+#endif
 	return 0;
 }
 
@@ -1777,8 +1846,13 @@ msmsdcc_probe(struct platform_device *pdev)
 	msmsdcc_writel(host, 0, MMCIMASK0);
 	msmsdcc_writel(host, 0x5e007ff, MMCICLEAR);
 
-	msmsdcc_writel(host, MCI_IRQENABLE, MMCIMASK0);
-	host->saved_irq0mask = MCI_IRQENABLE;
+	if (is_svlte_platform(host->plat)) {
+		msmsdcc_writel(host, MCI_IRQENABLE | MCI_PROGDONEMASK, MMCIMASK0);
+		host->saved_irq0mask = MCI_IRQENABLE | MCI_PROGDONEMASK;
+	} else {
+		msmsdcc_writel(host, MCI_IRQENABLE, MMCIMASK0);
+		host->saved_irq0mask = MCI_IRQENABLE;
+	}
 
 	wake_lock_init(&host->sdio_suspend_wlock, WAKE_LOCK_SUSPEND,
 			mmc_hostname(mmc));
@@ -1931,7 +2005,7 @@ msmsdcc_suspend(struct platform_device *dev, pm_message_t state)
 
 		if (mmc->card && (mmc->card->type != MMC_TYPE_SDIO ||
 			is_svlte_platform(host->plat)))
-			rc = mmc_suspend_host(mmc, state);
+			rc = mmc_suspend_host(mmc);
 
 		if (!rc) {
 			if (is_svlte_platform(host->plat)) {

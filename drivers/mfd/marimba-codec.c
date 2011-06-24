@@ -281,7 +281,7 @@ static int adie_codec_write(u8 reg, u8 mask, u8 val)
 	}
 	rc = marimba_write_bit_mask(adie_codec.pdrv_ptr, reg,  &val, 1, mask);
 	if (IS_ERR_VALUE(rc)) {
-		pr_err("%s: fail to write reg %x\n", __func__, reg);
+		pr_aud_err("%s: fail to write reg %x\n", __func__, reg);
 		return -EIO;
 	}
 
@@ -309,7 +309,7 @@ static int adie_codec_read_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 	rc = marimba_read(adie_codec.pdrv_ptr, reg, &cur_val, 1);
 
 	if (IS_ERR_VALUE(rc)) {
-		pr_err("%s: fail to read reg %x\n", __func__, reg);
+		pr_aud_err("%s: fail to read reg %x\n", __func__, reg);
 		return -EIO;
 	}
 
@@ -329,7 +329,7 @@ static int adie_codec_read_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 		}
 	}
 
-	pr_err("%s: could not find 0x%x in reg 0x%x values array\n",
+	pr_aud_err("%s: could not find 0x%x in reg 0x%x values array\n",
 			__func__, cur_val, reg);
 
 	return -EINVAL;;
@@ -376,7 +376,7 @@ static int adie_codec_set_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 
 			rc = adie_codec_write(reg, mask, val);
 			if (rc < 0) {
-				pr_err("%s: write reg %x val 0x%x failed\n",
+				pr_aud_err("%s: write reg %x val 0x%x failed\n",
 					__func__, reg, val);
 				return rc;
 			}
@@ -392,7 +392,7 @@ static int adie_codec_set_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 		rc = adie_codec_write(reg, mask, val);
 
 		if (rc < 0) {
-			pr_err("%s: write reg %x val 0x%x failed\n",
+			pr_aud_err("%s: write reg %x val 0x%x failed\n",
 					__func__, reg, val);
 			return rc;
 		}
@@ -416,7 +416,7 @@ static int adie_codec_set_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 
 			rc = adie_codec_write(reg, mask, val);
 			if (rc < 0) {
-				pr_err("%s: write reg %x val 0x%x failed\n",
+				pr_aud_err("%s: write reg %x val 0x%x failed\n",
 					__func__, reg, val);
 				return rc;
 			}
@@ -432,7 +432,7 @@ static int adie_codec_set_dig_vol(enum adie_vol_type vol_type, u32 chan_index,
 		rc = adie_codec_write(reg, mask, val);
 
 		if (rc < 0) {
-			pr_err("%s: write reg %x val 0x%x failed\n",
+			pr_aud_err("%s: write reg %x val 0x%x failed\n",
 					__func__, reg, val);
 			return rc;
 		}
@@ -450,13 +450,13 @@ int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
 	u32 cur_step_index = 0;
 
 	if (path_ptr->curr_stage != ADIE_CODEC_DIGITAL_ANALOG_READY) {
-		pr_info("%s: Marimba codec not ready for volume control \n",
+		pr_aud_info("%s: Marimba codec not ready for volume control \n",
 		       __func__);
 		return  -EPERM;
 	}
 
 	if (num_channels > 2) {
-		pr_err("%s: Marimba codec only supports max two channels\n",
+		pr_aud_err("%s: Marimba codec only supports max two channels\n",
 		       __func__);
 		return -EINVAL;
 	}
@@ -466,7 +466,7 @@ int adie_codec_set_device_digital_volume(struct adie_codec_path *path_ptr,
 	else if (path_ptr->profile->path_type == ADIE_CODEC_TX)
 		vol_type = ADIE_CODEC_TX_DIG_VOL;
 	else {
-		pr_err("%s: invalid device data neither RX nor TX\n",
+		pr_aud_err("%s: invalid device data neither RX nor TX\n",
 				__func__);
 		return -EINVAL;
 	}
@@ -512,7 +512,7 @@ EXPORT_SYMBOL(adie_codec_set_device_digital_volume);
 int adie_codec_set_device_analog_volume(struct adie_codec_path *path_ptr,
 		u32 num_channels, u32 volume /* in percentage */)
 {
-	pr_err("%s: analog device volume not supported\n", __func__);
+	pr_aud_err("%s: analog device volume not supported\n", __func__);
 
 	return -EPERM;
 }
@@ -584,12 +584,12 @@ int adie_codec_enable_sidetone(struct adie_codec_path *rx_path_ptr,
 	mutex_lock(&adie_codec.lock);
 
 	if (!rx_path_ptr || &adie_codec.path[ADIE_CODEC_RX] != rx_path_ptr) {
-		pr_err("%s: invalid path pointer\n", __func__);
+		pr_aud_err("%s: invalid path pointer\n", __func__);
 		rc = -EINVAL;
 		goto error;
 	} else if (rx_path_ptr->curr_stage !=
 		ADIE_CODEC_DIGITAL_ANALOG_READY) {
-		pr_err("%s: bad state\n", __func__);
+		pr_aud_err("%s: bad state\n", __func__);
 		rc = -EPERM;
 		goto error;
 	}
@@ -694,7 +694,7 @@ int adie_codec_open(struct adie_codec_dev_profile *profile,
 
 			rc = adie_codec.codec_pdata->marimba_codec_power(1);
 			if (rc) {
-				pr_err("%s: could not power up marimba "
+				pr_aud_err("%s: could not power up marimba "
 						"codec\n", __func__);
 				goto error;
 			}
@@ -777,7 +777,7 @@ int adie_codec_close(struct adie_codec_path *path_ptr)
 
 			rc = adie_codec.codec_pdata->marimba_codec_power(0);
 			if (rc) {
-				pr_err("%s: could not power down marimba "
+				pr_aud_err("%s: could not power down marimba "
 						"codec\n", __func__);
 				goto error;
 			}
@@ -800,7 +800,7 @@ int usb_headset_adie_enable(int enable)
 
 			rc = adie_codec.codec_pdata->marimba_codec_power(1);
 			if (rc) {
-				pr_err("%s: could not power up marimba "
+				pr_aud_err("%s: could not power up marimba "
 						"codec\n", __func__);
 				goto error;
 			}
@@ -836,7 +836,7 @@ int usb_headset_adie_enable(int enable)
 		mdelay(30);
 		adie_codec.usb_state = 1;
 		adie_codec.ref_cnt++;
-		pr_err("usb adie enabled\n");
+		pr_aud_err("usb adie enabled\n");
 	} else if (enable) {
 		adie_codec.ref_cnt++;
 		adie_codec.usb_state = 1;
@@ -860,12 +860,12 @@ int usb_headset_adie_enable(int enable)
 
 			rc = adie_codec.codec_pdata->marimba_codec_power(0);
 			if (rc) {
-				pr_err("%s: could not power down marimba "
+				pr_aud_err("%s: could not power down marimba "
 						"codec\n", __func__);
 				goto error;
 			}
 		}
-		pr_err("usb headset adie disabled");
+		pr_aud_err("usb headset adie disabled");
 	}
 error:
 	mutex_unlock(&adie_codec.lock);
@@ -875,11 +875,11 @@ EXPORT_SYMBOL(usb_headset_adie_enable);
 
 static int marimba_codec_probe(struct platform_device *pdev)
 {
-	pr_info("%s\n", __func__);
+	pr_aud_info("%s\n", __func__);
 	adie_codec.pdrv_ptr = platform_get_drvdata(pdev);
 	adie_codec.codec_pdata = pdev->dev.platform_data;
 	if (adie_codec.pdrv_ptr == NULL)
-		pr_err("\n\n\n============ adie_codec.pdrv_ptr == NULL ========\n\n\n");
+		pr_aud_err("\n\n\n============ adie_codec.pdrv_ptr == NULL ========\n\n\n");
 
 	return 0;
 }
@@ -896,7 +896,7 @@ static int __init marimba_codec_init(void)
 {
 	s32 rc;
 
-	pr_info("%s\n", __func__);
+	pr_aud_info("%s\n", __func__);
 	rc = platform_driver_register(&marimba_codec_driver);
 	if (IS_ERR_VALUE(rc))
 		goto error;

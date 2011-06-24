@@ -1119,7 +1119,7 @@ static inline u32 xhci_get_max_esit_payload(struct xhci_hcd *xhci,
 	if (udev->speed == USB_SPEED_SUPER)
 		return ep->ss_ep_comp.wBytesPerInterval;
 
-	max_packet = GET_MAX_PACKET(ep->desc.wMaxPacketSize);
+	max_packet = ep->desc.wMaxPacketSize & 0x3ff;
 	max_burst = (ep->desc.wMaxPacketSize & 0x1800) >> 11;
 	/* A 0 in max burst means 1 transfer per ESIT */
 	return max_packet * (max_burst + 1);
@@ -1198,7 +1198,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 		/* Fall through */
 	case USB_SPEED_FULL:
 	case USB_SPEED_LOW:
-		max_packet = GET_MAX_PACKET(ep->desc.wMaxPacketSize);
+		max_packet = ep->desc.wMaxPacketSize & 0x3ff;
 		ep_ctx->ep_info2 |= MAX_PACKET(max_packet);
 		break;
 	default:
@@ -1490,13 +1490,6 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	xhci->dcbaa = NULL;
 
 	scratchpad_free(xhci);
-
-	xhci->num_usb2_ports = 0;
-	xhci->num_usb3_ports = 0;
-	kfree(xhci->usb2_ports);
-	kfree(xhci->usb3_ports);
-	kfree(xhci->port_array);
-
 	xhci->page_size = 0;
 	xhci->page_shift = 0;
 }
@@ -1996,8 +1989,6 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 		xhci->devs[i] = NULL;
 
 	if (scratchpad_alloc(xhci, flags))
-		goto fail;
-	if (xhci_setup_port_arrays(xhci, flags))
 		goto fail;
 
 	return 0;

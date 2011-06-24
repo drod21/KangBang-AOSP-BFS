@@ -159,4 +159,10 @@
 #define MSM_PMIC_SSBI_PHYS    0xAD900000
 #define MSM_PMIC_SSBI_SIZE    SZ_4K
 
+#ifdef CONFIG_BUILD_CIQ
+#define SMD_CIQ_BASE		0xFC11C
 #endif
+
+#endif
+
+

@@ -496,7 +496,6 @@ void tty_flush_to_ldisc(struct tty_struct *tty)
  *
  *	Locking: tty buffer lock. Driver locks in low latency mode.
  */
-
 void tty_flip_buffer_push(struct tty_struct *tty)
 {
 	unsigned long flags;

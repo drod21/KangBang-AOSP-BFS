@@ -244,6 +244,14 @@
 #define CB_IDLEGCAFDEPTH                        2
 #define CB_ACTVGCAFDEPTH                        3
 
+#define WLC_IDLEACQINT                          0
+#define WLC_ACTVACQINT                          1
+#define WLC_ACTV2IDLETO                         2
+#define WLC_TCHTHR                              3
+#define WLC_NOISETHR                            4
+#define WLC_IDLEGCAFDEPTH                       5
+#define WLC_ACTVGCAFDEPTH                       6
+
 #define NC_TCHTHR                               0
 #define NC_TCHDI                                1
 #define NC_NOISETHR                             2
@@ -304,10 +312,11 @@ struct atmel_i2c_platform_data {
 	int8_t config_T8[10];
 	int8_t config_T9[32];
 	int8_t config_T15[11];
-	int8_t config_T19[12];
+	int8_t config_T18[2];
+	int8_t config_T19[16];
 	int8_t config_T20[12];
 	int8_t config_T22[17];
-	int8_t config_T23[13];
+	int8_t config_T23[15];
 	int8_t config_T24[19];
 	int8_t config_T25[14];
 	int8_t config_T27[7];
@@ -319,8 +328,8 @@ struct atmel_i2c_platform_data {
 	int8_t cable_config_T9[32];
 	int8_t cable_config_T22[17];
 	int8_t cable_config_T28[6];
-        int8_t wlc_config[7];
-        uint8_t wlc_freq[5];
+	int8_t wlc_config[7];
+	uint8_t wlc_freq[5];
 	int8_t noise_config[3];
 	uint8_t cal_tchthr[2];
 	uint16_t filter_level[4];

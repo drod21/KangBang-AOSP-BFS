@@ -33,6 +33,7 @@
 #include <mach/msm_fb.h>
 #include <mach/msm_panel.h>
 #include <mach/msm_iomap.h>
+#include <mach/debug_display.h>
 
 
 #if 1
@@ -119,7 +120,7 @@ static void himax_wait_vsync(struct msm_panel_data *panel_data)
 
 	if (wait_event_timeout(himax_vsync_wait, panel->himax_got_int,
 				HZ/2) == 0)
-		printk(KERN_ERR "timeout waiting for VSYNC\n");
+		PR_DISP_ERR("timeout waiting for VSYNC\n");
 
 	panel->himax_got_int = 0;
 	/* interrupt clears when screen dma starts */
@@ -241,7 +242,7 @@ static int setup_vsync(struct panel_info *panel, int init)
 	if (ret)
 		goto err_request_irq_failed;
 
-	printk(KERN_INFO "vsync on gpio %d now %d\n", gpio,
+	PR_DISP_INFO("vsync on gpio %d now %d\n", gpio,
 			gpio_get_value(gpio));
 	return 0;
 
@@ -285,7 +286,7 @@ static int mddi_himax_probe(struct platform_device *pdev)
         cabc_config.shrink_br = panel_data->shrink_br;
         cabc_config.change_cabcmode = panel_data->change_cabcmode;
         if (panel_data->caps & MSMFB_CAP_CABC) {
-                printk(KERN_INFO "CABC enabled\n");
+                PR_DISP_INFO("CABC enabled\n");
                 cabc_config.client = client_data;
                 platform_device_register(&mddi_himax_cabc);
         }

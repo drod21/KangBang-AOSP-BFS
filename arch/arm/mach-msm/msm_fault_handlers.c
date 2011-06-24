@@ -26,11 +26,19 @@
 static int msm_imp_ext_abort(unsigned long addr, unsigned int fsr,
 			     struct pt_regs *regs)
 {
+#ifdef CONFIG_ARCH_MSM8X60
+	int cpu;
+#endif
 	unsigned int regval;
 	static unsigned char flush_toggle;
 
+#ifdef CONFIG_ARCH_MSM8X60
+	asm("mrc p15, 7, %0, c15, c0, 1\n" /* read EFSR for fault status */
+	    : "=r" (regval));
+#else
 	asm("mrc p15, 0, %0, c5, c1, 0\n" /* read adfsr for fault status */
 		: "=r" (regval));
+#endif
 
 	pr_err("%s: ADFSR = 0x%.8x\n", __func__, regval);
 
@@ -54,6 +62,9 @@ static int msm_imp_ext_abort(unsigned long addr, unsigned int fsr,
 		return 0;
 	}
 
+#ifdef CONFIG_ARCH_MSM8X60
+	MRC(ADFSR,    p15, 0,  c5, c1, 0);
+#endif
 	MRC(DFSR,     p15, 0,  c5, c0, 0);
 	MRC(ACTLR,    p15, 0,  c1, c0, 1);
 	MRC(EFSR,     p15, 7, c15, c0, 1);
@@ -66,7 +77,13 @@ static int msm_imp_ext_abort(unsigned long addr, unsigned int fsr,
 	MRC(DMACHSR,  p15, 1, c11, c0, 0);
 	MRC(DMACHESR, p15, 1, c11, c0, 1);
 	MRC(DMACHCR,  p15, 0, c11, c0, 2);
+#ifdef CONFIG_ARCH_MSM8X60
+	for_each_online_cpu(cpu)
+		pr_info("cpu %d, acpuclk rate: %lu kHz\n", cpu,
+			acpuclk_get_rate(cpu));
+#else
 	pr_info("acpuclk rate: %lu kHz\n", acpuclk_get_rate());
+#endif
 
 	return 1;
 }

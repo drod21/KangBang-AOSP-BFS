@@ -21,6 +21,7 @@
 #include <mach/htc_pwrsink.h>
 #include <mach/msm_panel.h>
 #include "mddi_client_eid.h"
+#include <mach/debug_display.h>
 
 enum bc_mode {
 	BC_OFF = 0,
@@ -130,10 +131,10 @@ samsung_send_cmd(struct msm_mddi_client_data *client_data, unsigned cmd,
 
 	va_end(attr_list);
 #if DEBUG
-	printk(KERN_DEBUG "0x%x ", cmd);
+	PR_DISP_DEBUG("0x%x ", cmd);
 	for (i = 0; i < size; i++)
-		printk("0x%x ", prm[i]);
-	printk("\n");
+		PR_DISP_WARN("0x%x ", prm[i]);
+	PR_DISP_WARN("\n");
 #endif
 	if (client_data)
 		client_data->remote_write_vals(client_data, prm, cmd, size);
@@ -145,7 +146,7 @@ samsung_change_cabcmode(struct msm_mddi_client_data *client_data,
 {
 	u8 prm[20];
 
-	pr_debug("+%s, mode=%d, dimming=%d\n", __func__, mode, dimming);
+	PR_DISP_DEBUG("+%s, mode=%d, dimming=%d\n", __func__, mode, dimming);
 
 	samsung_send_cmd(client_data, MIECTL1, prm, 4, 0x5a, 0x5a, 0x30, 0x00);
 	samsung_send_cmd(client_data, MIECTL2, prm, 8, 0xe0, 0x07, 0x7c, 0x01,
@@ -169,7 +170,7 @@ __set_brightness(struct cabc *cabc, int brightness, u8 dimming)
 
 	/* no need to check brightness > LED_FULL, the led class
 	 * already does */
-	//printk(KERN_INFO "_set_brightness = %d\n", brightness);
+	//PR_DISP_INFO("_set_brightness = %d\n", brightness);
 
 	mutex_lock(&cabc->data_lock);
 	if(cabc->cabc_config->shrink && cabc->cabc_config->shrink_br)
@@ -308,11 +309,11 @@ cabc_bl_handle(struct platform_device *pdev, int brightness)
 	int resume_br;
 
 	if (unlikely(cabc == NULL)) {
-		printk(KERN_ERR "%s: do not have cabc data\n", __func__);
+		PR_DISP_ERR("%s: do not have cabc data\n", __func__);
 		return -ENOENT;
 	}
 
-	printk(KERN_DEBUG "turn %s backlight.\n",
+	PR_DISP_DEBUG("turn %s backlight.\n",
 			brightness == LED_FULL ? "on" : "off");
 
 	lcd_cdev = &cabc->lcd_backlight;
@@ -410,7 +411,7 @@ samsung_store(struct device *dev, struct device_attribute *attr,
 
 	rc = strict_strtoul(buf, 10, &res);
 	if (rc) {
-		printk(KERN_ERR "invalid parameter, %s %d\n", buf, rc);
+		PR_DISP_ERR("invalid parameter, %s %d\n", buf, rc);
 		count = -EINVAL;
 		goto err_out;
 	}
@@ -490,7 +491,7 @@ static int samsung_cabc_probe(struct platform_device *pdev)
 
 	data = pdev->dev.platform_data;
 	if (data == NULL || !data->client) {
-		printk(KERN_ERR "No CABC config data\n");
+		PR_DISP_ERR("No CABC config data\n");
 		err = -EINVAL;
 		goto err_client;
 	}

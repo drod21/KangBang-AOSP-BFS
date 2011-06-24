@@ -44,6 +44,8 @@
 #define	PM_PWM_LUT_REVERSE	0x04
 #define	PM_PWM_LUT_PAUSE_HI_EN	0x10
 #define	PM_PWM_LUT_PAUSE_LO_EN	0x20
+
+#define	PM_PWM_LUT_NO_TABLE	0x100
 #define	PM8058_LPG_CTL_REGS		7
 
 /* PWM LED ID */
@@ -75,6 +77,11 @@ struct pwm_device {
 	struct pm8058_pwm_chip	*chip;
 };
 
+struct pm8058_pwm_pdata {
+	int 	(*config)(struct pwm_device *pwm, int ch, int on);
+	int 	(*enable)(struct pwm_device *pwm, int ch, int on);
+};
+
 struct pw8058_pwm_config {
 	int	pwm_size;	/* round up to 6 or 9 for 6/9-bit PWM SIZE */
 	int	clk;
@@ -96,7 +103,7 @@ struct pw8058_pwm_config {
  * pm8058_pwm_lut_config - change a PWM device configuration to use LUT
  *
  * @pwm: the PWM device
- * @period_ns: period in nano second
+ * @period_us: period in micro second
  * @duty_pct: arrary of duty cycles in percent, like 20, 50.
  * @duty_time_ms: time for each duty cycle in millisecond
  * @start_idx: start index in lookup table from 0 to MAX-1
@@ -106,7 +113,7 @@ struct pw8058_pwm_config {
  * @flags: control flags
  *
  */
-int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_ns,
+int pm8058_pwm_lut_config(struct pwm_device *pwm, int period_us,
 			  int duty_pct[], int duty_time_ms, int start_idx,
 			  int len, int pause_lo, int pause_hi, int flags);
 
@@ -122,7 +129,7 @@ int pm8058_pwm_lut_enable(struct pwm_device *pwm, int start);
  */
 int pwm_configure(struct pwm_device *pwm, struct pw8058_pwm_config *pwm_conf);
 
-int pwm_set_dtest(struct pwm_device *pwm, int enable);
+int pm8058_pwm_set_dtest(struct pwm_device *pwm, int enable);
 
 int pm8058_pwm_config_led(struct pwm_device *pwm, int id,
 			  int mode, int max_current);

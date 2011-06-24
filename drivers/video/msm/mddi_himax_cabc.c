@@ -21,6 +21,7 @@
 #include <mach/htc_pwrsink.h>
 #include <mach/msm_panel.h>
 #include "mddi_client_eid.h"
+#include <mach/debug_display.h>
 
 enum bc_mode {
 	BC_OFF = 0,
@@ -112,7 +113,7 @@ static int
 himax_change_cabcmode(struct msm_mddi_client_data *client_data,
 		int mode, u8 dimming)
 {
-	pr_debug("+%s, mode=%d, dimming=%d\n", __func__, mode, dimming);
+	PR_DISP_DEBUG("+%s, mode=%d, dimming=%d\n", __func__, mode, dimming);
 	return 0;
 }
 
@@ -124,7 +125,7 @@ __set_brightness(struct cabc *cabc, int brightness, u8 dimming)
 	int shrink_br;
 	/* no need to check brightness > LED_FULL, the led class
 	 * already does */
-	printk(KERN_INFO "brightness = %d, %s ls-(%s)\n",
+	PR_DISP_INFO("brightness = %d, %s ls-(%s)\n",
 		brightness, str_bc_mode[cabc->mode_bc],
 		(test_bit(LS_STATE, &cabc->status) ? "on" : "off"));
 
@@ -239,11 +240,11 @@ cabc_bl_handle(struct platform_device *pdev, int brightness)
         struct led_classdev *lcd_cdev;
 
         if (unlikely(cabc == NULL)) {
-                printk(KERN_ERR "%s: do not have cabc data\n", __func__);
+                PR_DISP_ERR("%s: do not have cabc data\n", __func__);
                 return -ENOENT;
         }
 
-        printk(KERN_DEBUG "turn %s backlight.\n",
+        PR_DISP_DEBUG("turn %s backlight.\n",
                         brightness == LED_FULL ? "on" : "off");
 
         lcd_cdev = &cabc->lcd_backlight;
@@ -344,7 +345,7 @@ himax_store(struct device *dev, struct device_attribute *attr,
 
 	rc = strict_strtoul(buf, 10, &res);
 	if (rc) {
-		printk(KERN_ERR "invalid parameter, %s %d\n", buf, rc);
+		PR_DISP_ERR("invalid parameter, %s %d\n", buf, rc);
 		count = -EINVAL;
 		goto err_out;
 	}
@@ -389,7 +390,7 @@ static int himax_cabc_probe(struct platform_device *pdev)
 
 	data = pdev->dev.platform_data;
 	if (data == NULL || !data->client) {
-		printk(KERN_ERR "No CABC config data\n");
+		PR_DISP_ERR("No CABC config data\n");
 		err = -EINVAL;
 		goto err_client;
 	}

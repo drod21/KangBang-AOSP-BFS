@@ -247,6 +247,9 @@ deps_config := \
 	drivers/video/omap/Kconfig \
 	drivers/video/msm/vidc/Kconfig \
 	drivers/video/msm/Kconfig \
+	drivers/video/msm_8x60/sii9234/Kconfig \
+	drivers/video/msm_8x60/vidc/Kconfig \
+	drivers/video/msm_8x60/Kconfig \
 	drivers/video/geode/Kconfig \
 	drivers/gpu/drm/radeon/Kconfig \
 	drivers/gpu/drm/Kconfig \
@@ -323,12 +326,12 @@ deps_config := \
 	drivers/i2c/busses/Kconfig \
 	drivers/i2c/algos/Kconfig \
 	drivers/i2c/Kconfig \
-	drivers/char/diag/Kconfig \
 	drivers/s390/char/Kconfig \
 	drivers/char/tpm/Kconfig \
 	drivers/char/pcmcia/Kconfig \
 	drivers/char/hw_random/Kconfig \
 	drivers/char/ipmi/Kconfig \
+	drivers/char/diag/Kconfig \
 	drivers/serial/Kconfig \
 	drivers/char/Kconfig \
 	drivers/input/gameport/Kconfig \
@@ -358,6 +361,7 @@ deps_config := \
 	drivers/isdn/hisax/Kconfig \
 	drivers/isdn/i4l/Kconfig \
 	drivers/isdn/Kconfig \
+	drivers/net/caif/Kconfig \
 	drivers/s390/net/Kconfig \
 	drivers/ieee802154/Kconfig \
 	drivers/atm/Kconfig \
@@ -367,6 +371,7 @@ deps_config := \
 	drivers/net/wimax/SQN/Kconfig \
 	drivers/net/wimax/i2400m/Kconfig \
 	drivers/net/wimax/Kconfig \
+	drivers/net/wireless/bcm4329_204/Kconfig \
 	drivers/net/wireless/bcm4329/Kconfig \
 	drivers/net/wireless/zd1211rw/Kconfig \
 	drivers/net/wireless/wl12xx/Kconfig \
@@ -391,6 +396,7 @@ deps_config := \
 	drivers/net/sfc/Kconfig \
 	drivers/net/stmmac/Kconfig \
 	drivers/net/ixp2000/Kconfig \
+	drivers/net/octeon/Kconfig \
 	drivers/net/fs_enet/Kconfig \
 	drivers/net/ibm_newemac/Kconfig \
 	drivers/net/tulip/Kconfig \
@@ -423,6 +429,7 @@ deps_config := \
 	drivers/scsi/libsas/Kconfig \
 	drivers/scsi/Kconfig \
 	drivers/ide/Kconfig \
+	drivers/misc/mpu3050/Kconfig \
 	drivers/misc/video_core/720p/Kconfig \
 	drivers/misc/iwmc3200top/Kconfig \
 	drivers/misc/cb710/Kconfig \

@@ -74,6 +74,7 @@
 #include <asm/mach-types.h>
 #include <linux/semaphore.h>
 #include <linux/uaccess.h>
+#include <mach/debug_display.h>
 
 #include "mdp_hw.h"
 #include "mdp4.h"
@@ -86,7 +87,7 @@ void mdp4_sw_reset(struct mdp_info *mdp, ulong bits)
 
 	while (mdp_readl(mdp, 0x001c) & bits) /* self clear when complete */
 		;
-	printk("mdp4_sw_reset: 0x%x\n", (int)bits);
+	PR_DISP_WARN("mdp4_sw_reset: 0x%x\n", (int)bits);
 }
 
 void mdp4_overlay_cfg(struct mdp_info *mdp, int overlayer, int blt_mode, int refresh, int direct_out)
@@ -105,7 +106,7 @@ void mdp4_overlay_cfg(struct mdp_info *mdp, int overlayer, int blt_mode, int ref
 	else
 	  mdp_writel(mdp, bits, 0x18004); /* MDP_OVERLAY1_CFG */
 
-	printk("mdp4_overlay_cfg: 0x%x\n", (int)mdp_readl(mdp, 0x10004));
+	PR_DISP_WARN("mdp4_overlay_cfg: 0x%x\n", (int)mdp_readl(mdp, 0x10004));
 }
 
 void mdp4_display_intf_sel(struct mdp_info *mdp, int output, ulong intf)
@@ -118,14 +119,14 @@ void mdp4_display_intf_sel(struct mdp_info *mdp, int output, ulong intf)
 		data = 0x40;	/* bit 6 */
 		intf = MDDI_LCDC_INTF;
 		if (output == SECONDARY_INTF_SEL) {
-			printk(KERN_INFO "%s: Illegal INTF selected, output=%d \
+			PR_DISP_INFO("%s: Illegal INTF selected, output=%d \
 				intf=%d\n", __func__, output, (int)intf);
 		}
 	} else if (intf == DSI_CMD_INTF) {
 		data = 0x80;	/* bit 7 */
 		intf = MDDI_INTF;
 		if (output == EXTERNAL_INTF_SEL) {
-			printk(KERN_INFO "%s: Illegal INTF selected, output=%d \
+			PR_DISP_INFO("%s: Illegal INTF selected, output=%d \
 				intf=%d\n", __func__, output, (int)intf);
 		}
 	} else
@@ -156,7 +157,7 @@ void mdp4_display_intf_sel(struct mdp_info *mdp, int output, ulong intf)
 
 	mdp_writel(mdp, bits, 0x0038); /* MDP_DISP_INTF_SEL */
 
-  printk("mdp4_display_intf_sel: 0x%x\n", (int)mdp_readl(mdp, 0x0038));
+  PR_DISP_WARN("mdp4_display_intf_sel: 0x%x\n", (int)mdp_readl(mdp, 0x0038));
 }
 
 unsigned long mdp4_display_status(struct mdp_info *mdp)
@@ -206,7 +207,7 @@ void mdp4_fetch_cfg(struct mdp_info *mdp, uint32_t clk, uint32_t pclk)
 	int i;
 
 	if (clk <= pclk)
-		printk(KERN_INFO "mdp4_fetch_cfg: ERROR!! mdp_clk=%d \
+		PR_DISP_INFO("mdp4_fetch_cfg: ERROR!! mdp_clk=%d \
 				<= mdp_pclk=%d\n", (int)clk, (int)pclk);
 
 	if (clk >= 90000000) { /* 90 Mhz */
@@ -217,7 +218,7 @@ void mdp4_fetch_cfg(struct mdp_info *mdp, uint32_t clk, uint32_t pclk)
 		vg_data = 0xc3; /* 16 bytes-burst x 4 req */
 	}
 
-	printk(KERN_INFO "mdp4_fetch_cfg: dmap=%x vg=%x\n",
+	PR_DISP_INFO("mdp4_fetch_cfg: dmap=%x vg=%x\n",
 			dmap_data, vg_data);
 
 	/* dma_p fetch config */
@@ -239,7 +240,7 @@ void mdp4_hw_init(struct mdp_info *mdp)
 {
 	ulong bits;
 
-	printk("%s\n",__func__);
+	PR_DISP_WARN("%s\n",__func__);
 #ifdef MDP4_ERROR
 	/*
 	 * Issue software reset on DMA_P will casue DMA_P dma engine stall

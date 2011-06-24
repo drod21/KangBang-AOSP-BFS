@@ -14,6 +14,10 @@
  *
  */
 
+#if defined(CONFIG_ARCH_MSM8X60)
+#include "msm_adsp-8x60.h"
+#endif
+
 #ifndef __ASM__ARCH_MSM_ADSP_H
 #define __ASM__ARCH_MSM_ADSP_H
 
@@ -53,7 +57,7 @@ int msm_adsp_write(struct msm_adsp_module *module,
 		   unsigned queue_id,
 		   void *data, size_t len);
 
-#define ADSP_MESSAGE_ID 0xFFFF
+#define ADSP_MESSAGE_ID -1
 
 #if 1
 /* Command Queue Indexes */

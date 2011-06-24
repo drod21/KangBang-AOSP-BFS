@@ -604,7 +604,7 @@ static int snd_ctl_elem_list(struct snd_card *card,
 	space = list.space;
 	first = 0;
 	/* try limit maximum space */
-	if (space > 16384)
+	if (space > 65535)
 		return -ENOMEM;
 	if (space > 0) {
 		/* allocate temporary buffer for atomic operation */

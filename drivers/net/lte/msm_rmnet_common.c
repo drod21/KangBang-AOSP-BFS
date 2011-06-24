@@ -115,6 +115,7 @@ static void rmnet_early_suspend(struct early_suspend *handler)
 		struct rmnet_private *p = netdev_priv(to_net_dev(rmnet0));
 		p->timeout_us = timeout_suspend_us;
 	}
+	pr_info("[imosey] lte suspending\n");
 }
 
 static void rmnet_late_resume(struct early_suspend *handler)
@@ -123,6 +124,7 @@ static void rmnet_late_resume(struct early_suspend *handler)
 		struct rmnet_private *p = netdev_priv(to_net_dev(rmnet0));
 		p->timeout_us = timeout_us;
 	}
+	pr_info("[imosey] lte resuming\n");
 }
 
 static struct early_suspend rmnet_power_suspend = {

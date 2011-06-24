@@ -194,6 +194,8 @@ MODULE_LICENSE("GPL v2");
 MODULE_VERSION("0.2");
 MODULE_ALIAS("platform:spi_qsd");
 
+static struct pm_qos_request_list *qos_req_list;
+
 #ifdef CONFIG_DEBUG_FS
 /* Used to create debugfs entries */
 static const struct {
@@ -846,8 +848,9 @@ static void msm_spi_workq(struct work_struct *work)
 	u32                  status_error = 0;
 
 	/* Don't allow power collapse */
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
-				  dd->pm_lat);
+//	pm_qos_update_request(PM_QOS_CPU_DMA_LATENCY, "msm_spi", dd->pm_lat);
+        pm_qos_update_request(qos_req_list, dd->pm_lat);
+
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
 
@@ -904,8 +907,8 @@ static void msm_spi_workq(struct work_struct *work)
 	if (dd->use_rlock)
 		remote_mutex_unlock(&dd->r_lock);
 
-	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
-				  PM_QOS_DEFAULT_VALUE);
+//	pm_qos_update_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi", PM_QOS_DEFAULT_VALUE);
+        pm_qos_update_request(qos_req_list, PM_QOS_DEFAULT_VALUE);
 
 	if (dd->suspended)
 		wake_up_interruptible(&dd->continue_suspend);
@@ -1451,6 +1454,11 @@ static int msm_spi_probe(struct platform_device *pdev)
 		}
 		dd->use_rlock = 1;
 		dd->pm_lat = pdata->pm_lat;
+
+                qos_req_list = pm_qos_add_request(PM_QOS_CPU_DMA_LATENCY,
+                                            PM_QOS_DEFAULT_VALUE);
+
+/*
 		rc = pm_qos_add_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi",
 					    PM_QOS_DEFAULT_VALUE);
 		if (rc) {
@@ -1458,6 +1466,12 @@ static int msm_spi_probe(struct platform_device *pdev)
 				__func__);
 			goto err_probe_add_pm_qos;
 		}
+*/
+                if (IS_ERR(qos_req_list)) {
+                        dev_err(&pdev->dev, "%s: Failed to request pm_qos\n",
+                                __func__);
+                        goto err_probe_add_pm_qos;
+                }
 	}
 	if (dd->use_rlock)
 		remote_mutex_lock(&dd->r_lock);
@@ -1652,7 +1666,8 @@ static int __devexit msm_spi_remove(struct platform_device *pdev)
 	struct msm_spi    *dd = spi_master_get_devdata(master);
 	struct msm_spi_platform_data *pdata = pdev->dev.platform_data;
 
-	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi");
+	pm_qos_remove_request(qos_req_list);
+//	pm_qos_remove_requirement(PM_QOS_CPU_DMA_LATENCY, "msm_spi");
 	spi_debugfs_exit(dd);
 	sysfs_remove_group(&pdev->dev.kobj, &dev_attr_grp);
 

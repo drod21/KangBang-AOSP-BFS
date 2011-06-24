@@ -20,7 +20,7 @@
 #endif
 
 #ifdef CONFIG_MSM_CAMERA_DEBUG
-#define CDBG(fmt, args...) printk(KERN_INFO "msm_camera: " fmt, ##args)
+#define CDBG(fmt, args...) printk(KERN_INFO "[CAM] msm_camera: " fmt, ##args)
 #else
 #define CDBG(fmt, args...) do { } while (0)
 #endif
@@ -32,6 +32,7 @@
 #define NUM_AUTOFOCUS_MULTI_WINDOW_GRIDS 16
 #define NUM_STAT_OUTPUT_BUFFERS      3
 #define NUM_AF_STAT_OUTPUT_BUFFERS      3
+#define max_control_command_size 150
 
 enum msm_queue {
 	MSM_CAM_Q_CTRL,     /* control command or control command status */
@@ -70,6 +71,9 @@ enum vfe_resp_msg {
 	VFE_MSG_STATS_IHIST,
 	VFE_MSG_STATS_SKIN,
 	VFE_MSG_STATS_WE, /* AEC + AWB */
+	VFE_MSG_SYNC_TIMER0,
+	VFE_MSG_SYNC_TIMER1,
+	VFE_MSG_SYNC_TIMER2,
 #endif
 
 
@@ -196,6 +200,13 @@ struct msm_sensor_ctrl {
 	int (*s_config)(void __user *);
 	int node;
 };
+struct msm_strobe_flash_ctrl {
+	int (*strobe_flash_init)
+		(struct msm_camera_sensor_strobe_flash_data *);
+	int (*strobe_flash_release)
+		(struct msm_camera_sensor_strobe_flash_data *, int32_t);
+	int (*strobe_flash_charge)(int32_t, int32_t, uint32_t);
+};
 
 /* this structure is used in kernel */
 struct msm_queue_cmd {
@@ -206,8 +217,9 @@ struct msm_queue_cmd {
 	struct list_head list_vpe_frame;
 	enum msm_queue type;
 	void *command;
-	int on_heap;
+	atomic_t on_heap;
 	struct timespec ts;
+	uint32_t error_code;
 };
 
 
@@ -252,6 +264,7 @@ struct msm_sync {
 	struct msm_camvfe_fn vfefn;
 	struct msm_camvpe_fn vpefn;
 	struct msm_sensor_ctrl sctrl;
+	struct msm_strobe_flash_ctrl sfctrl;
 	struct wake_lock wake_suspend_lock;
 	struct wake_lock wake_lock;
 	struct platform_device *pdev;
@@ -261,9 +274,10 @@ struct msm_sync {
 
 	atomic_t vpe_enable;
 	uint32_t pp_mask;
+	uint8_t pp_frame_avail;
 	struct msm_queue_cmd *pp_prev;
 	struct msm_queue_cmd *pp_snap;
-	//struct msm_queue_cmd *pp_thumb;
+	struct msm_queue_cmd *pp_thumb;
 	int video_fd;
 
 	/* When this flag is set, we send preview-frame notifications to config
@@ -275,12 +289,17 @@ struct msm_sync {
 
 	struct mutex lock;
 	struct list_head list;
+	uint8_t liveshot_enabled;
+
+	spinlock_t pmem_frame_spinlock;
+	spinlock_t pmem_stats_spinlock;
+	spinlock_t abort_pict_lock;
 };
 
 #define MSM_APPS_ID_V4L2 "msm_v4l2"
 #define MSM_APPS_ID_PROP "msm_qct"
 
-struct msm_device {
+struct msm_cam_device {
 	struct msm_sync *sync; /* most-frequently accessed */
 	struct device *device;
 	struct cdev cdev;
@@ -291,10 +310,10 @@ struct msm_device {
 };
 
 struct msm_control_device {
-	struct msm_device *pmsm;
+	struct msm_cam_device *pmsm;
 
 	/* Used for MSM_CAM_IOCTL_CTRL_CMD_DONE responses */
-	uint8_t ctrl_data[50];
+	uint8_t ctrl_data[max_control_command_size];
 	struct msm_ctrl_cmd ctrl;
 	struct msm_queue_cmd qcmd;
 
@@ -312,9 +331,7 @@ struct register_address_value_pair {
 struct msm_pmem_region {
 	struct hlist_node list;
 	unsigned long paddr;
-//#ifdef CONFIG_MSM_CAMERA_LEGACY
 	unsigned long kvaddr;
-//#endif
 	unsigned long len;
 	struct file *file;
 	struct msm_pmem_info info;
@@ -323,9 +340,7 @@ struct msm_pmem_region {
 struct axidata {
 	uint32_t bufnum1;
 	uint32_t bufnum2;
-//#ifdef CONFIG_720P_CAMERA
 	uint32_t bufnum3;
-//#endif
 	struct msm_pmem_region *region;
 };
 
@@ -333,6 +348,11 @@ struct axidata {
 	int msm_camera_flash_set_led_state(
 		struct msm_camera_sensor_flash_data *fdata,
 		unsigned led_state);
+	static inline int msm_strobe_flash_init(
+		struct msm_sync *sync, uint32_t sftype)
+	{
+		return -ENOTSUPP;
+	}
 #else
 	static inline int msm_camera_flash_set_led_state(
 		struct msm_camera_sensor_flash_data *fdata,
@@ -372,16 +392,24 @@ enum msm_camio_clk_type {
 	CAMIO_MDC_CLK,
 	CAMIO_VFE_CLK,
 	CAMIO_VFE_AXI_CLK,
-//#ifdef CONFIG_MSM_CAMERA_7X30
 	CAMIO_VFE_CLK_FOR_MIPI_2_LANE,
 	CAMIO_VFE_CAMIF_CLK,
 	CAMIO_VFE_PBDG_CLK,
 	CAMIO_CAM_MCLK_CLK,
 	CAMIO_CAMIF_PAD_PBDG_CLK,
-	CAMIO_CSI_CLK,
-	CAMIO_CSI_VFE_CLK,
-	CAMIO_CSI_PCLK,
-//#endif
+	CAMIO_CSI0_VFE_CLK,
+	CAMIO_CSI1_VFE_CLK,
+	CAMIO_VFE_PCLK,
+	CAMIO_CSI_SRC_CLK,
+	CAMIO_CSI0_CLK,
+	CAMIO_CSI1_CLK,
+
+	CAMIO_CSI0_PCLK,
+	CAMIO_CSI1_PCLK,
+	CAMIO_JPEG_CLK,
+	CAMIO_JPEG_PCLK,
+	CAMIO_VPE_CLK,
+	CAMIO_VPE_PCLK,
 	CAMIO_MAX_CLK
 };
 
@@ -441,19 +469,33 @@ int msm_camio_probe_off(struct platform_device *);
 #ifdef CONFIG_MSM_CAMERA_7X30
 void msm_camio_clk_rate_set_2(struct clk *clk, int rate);
 void msm_disable_io_gpio_clk(struct platform_device *);
+int msm_camio_read_camif_status(void);
+#endif
+
+#ifdef CONFIG_MSM_CAMERA_8X60
+int msm_camio_vpe_clk_enable(void);
+int msm_camio_vpe_clk_disable(void);
+void msm_camio_clk_rate_set_2(struct clk *clk, int rate);
+void msm_camio_clk_set_min_rate(struct clk *clk, int rate);
+void msm_disable_io_gpio_clk(struct platform_device *);
+int msm_camio_sensor_clk_off(struct platform_device *);
+int msm_camio_sensor_clk_on(struct platform_device *);
+#endif
+
+int msm_camio_jpeg_clk_enable(void);
+int msm_camio_jpeg_clk_disable(void);
+
+int add_axi_qos(void);
 int request_axi_qos(uint32_t freq);
 int update_axi_qos(uint32_t freq);
 void release_axi_qos(void);
-int msm_camio_read_camif_status(void);
 
+int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
 void msm_io_w(u32 data, void __iomem *addr);
 void msm_io_w_mb(u32 data, void __iomem *addr);
 u32 msm_io_r(void __iomem *addr);
 u32 msm_io_r_mb(void __iomem *addr);
 void msm_io_dump(void __iomem *addr, int size);
 void msm_io_memcpy(void __iomem *dest_addr, void __iomem *src_addr, u32 len);
-#endif
-
-int msm_camio_csi_config(struct msm_camera_csi_params *csi_params);
 
 #endif

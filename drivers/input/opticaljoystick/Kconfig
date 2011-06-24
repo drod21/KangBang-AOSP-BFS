@@ -1,5 +1,5 @@
 #
-# Touchscreen driver configuration
+# opticaljoystick driver configuration
 #
 menuconfig INPUT_OPTICALJOYSTICK
 	bool "Opticaljoystick"

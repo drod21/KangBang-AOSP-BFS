@@ -70,7 +70,7 @@ static int is_rpc_connect(void)
 		endpoint = msm_rpc_connect(HTCPROG,
 				HTCVERS, 0);
 		if (IS_ERR(endpoint)) {
-			pr_err("%s: init rpc failed! rc = %ld\n",
+			pr_aud_err("%s: init rpc failed! rc = %ld\n",
 				__func__, PTR_ERR(endpoint));
 			mutex_unlock(&rpc_connect_lock);
 			return -1;
@@ -196,7 +196,7 @@ static int htc_acdb_open(struct inode *inode, struct file *file)
 		else
 			acdb_smem_size = HTC_DEF_ACDB_SMEM_SIZE;
 
-		pr_info("%s: smem size %d\n", __func__, acdb_smem_size);
+		pr_aud_info("%s: smem size %d\n", __func__, acdb_smem_size);
 
 		req_smem.size = cpu_to_be32(acdb_smem_size);
 		rep_smem.n = cpu_to_be32(reply_value);
@@ -276,9 +276,9 @@ static int acdb_init(char *filename)
 	uint32_t size = 0, ptr, acdb_radio_buffer_size = 0;
 	int rc = 0;
 
-	pr_info("acdb: load '%s'\n", filename);
+	pr_aud_info("acdb: load '%s'\n", filename);
 	if (request_firmware(&fw, filename, htc_acdb_misc.this_device) < 0) {
-		pr_err("acdb: load '%s' failed...\n", filename);
+		pr_aud_err("acdb: load '%s' failed...\n", filename);
 		return -ENODEV;
 	}
 
@@ -332,7 +332,7 @@ static int __init htc_acdb_init(void)
 	mutex_init(&rpc_connect_lock);
 	ret = misc_register(&htc_acdb_misc);
 	if (ret < 0)
-		pr_err("%s: failed to register misc device!\n", __func__);
+		pr_aud_err("%s: failed to register misc device!\n", __func__);
 
 	return ret;
 }

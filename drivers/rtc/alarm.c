@@ -73,6 +73,7 @@ static bool suspended;
  * system_time - (resume_system_time - xtal_ticks)
  */
 static struct timespec elapsed_real_ticks_offset;
+static DEFINE_MUTEX(alarm_ticksoffset_mutex);
 #endif
 
 static void update_timer_locked(struct alarm_queue *base, bool head_removed)
@@ -116,12 +117,15 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 	struct rb_node *parent = NULL;
 	struct alarm *entry;
 	int leftmost = 1;
+	bool was_first = false;
 
 	pr_alarm(FLOW, "added alarm, type %d, func %pF at %lld\n",
 		alarm->type, alarm->function, ktime_to_ns(alarm->expires));
 
-	if (base->first == &alarm->node)
+	if (base->first == &alarm->node) {
 		base->first = rb_next(&alarm->node);
+		was_first = true;
+	}
 	if (!RB_EMPTY_NODE(&alarm->node)) {
 		rb_erase(&alarm->node, &base->alarms);
 		RB_CLEAR_NODE(&alarm->node);
@@ -141,10 +145,10 @@ static void alarm_enqueue_locked(struct alarm *alarm)
 			leftmost = 0;
 		}
 	}
-	if (leftmost) {
+	if (leftmost)
 		base->first = &alarm->node;
-		update_timer_locked(base, false);
-	}
+	if (leftmost || was_first)
+		update_timer_locked(base, was_first);
 
 	rb_link_node(&alarm->node, parent, link);
 	rb_insert_color(&alarm->node, &base->alarms);
@@ -276,11 +280,13 @@ int alarm_set_rtc(struct timespec new_time)
 		alarms[ANDROID_ALARM_ELAPSED_REALTIME].delta =
 		ktime_sub(alarms[ANDROID_ALARM_ELAPSED_REALTIME].delta,
 			timespec_to_ktime(timespec_sub(tmp_time, new_time)));
+	spin_unlock_irqrestore(&alarm_slock, flags);
 #ifdef CONFIG_BUILD_CIQ
+	mutex_lock(&alarm_ticksoffset_mutex);
 	elapsed_real_ticks_offset = timespec_sub(
 		elapsed_real_ticks_offset, timespec_sub(tmp_time, new_time));
+	mutex_unlock(&alarm_ticksoffset_mutex);
 #endif
-	spin_unlock_irqrestore(&alarm_slock, flags);
 	ret = do_settimeofday(&new_time);
 	spin_lock_irqsave(&alarm_slock, flags);
 	for (i = 0; i < ANDROID_ALARM_SYSTEMTIME; i++) {
@@ -334,12 +340,11 @@ ktime_t alarm_get_elapsed_realtime(void)
 int alarm_get_elapsed_ticks(struct timespec *elapsed_ticks)
 {
 	struct timespec tmp_time;
-	unsigned long flags;
 
 	getnstimeofday(&tmp_time);
-	spin_lock_irqsave(&alarm_slock, flags);
+	mutex_lock(&alarm_ticksoffset_mutex);
 	*elapsed_ticks = timespec_sub(tmp_time, elapsed_real_ticks_offset);
-	spin_unlock_irqrestore(&alarm_slock, flags);
+	mutex_unlock(&alarm_ticksoffset_mutex);
 	return 0;
 }
 #endif
@@ -489,11 +494,11 @@ static int alarm_resume(struct platform_device *pdev)
 	spin_unlock_irqrestore(&alarm_slock, flags);
 #ifdef CONFIG_BUILD_CIQ
 	getnstimeofday(&tmp_time);
-	spin_lock_irqsave(&alarm_slock, flags);
+	mutex_lock(&alarm_ticksoffset_mutex);
 	rtc_read_ticks(alarm_rtc_dev, &elapsed_real_ticks_offset);
 	elapsed_real_ticks_offset =
 		timespec_sub(tmp_time, elapsed_real_ticks_offset);
-	spin_unlock_irqrestore(&alarm_slock, flags);
+	mutex_unlock(&alarm_ticksoffset_mutex);
 #endif
 	return 0;
 }
@@ -578,12 +583,15 @@ static int __init alarm_late_init(void)
 	alarms[ANDROID_ALARM_ELAPSED_REALTIME_WAKEUP].delta =
 		alarms[ANDROID_ALARM_ELAPSED_REALTIME].delta =
 			timespec_to_ktime(timespec_sub(tmp_time, system_time));
+	spin_unlock_irqrestore(&alarm_slock, flags);
+
 #ifdef CONFIG_BUILD_CIQ
+	mutex_lock(&alarm_ticksoffset_mutex);
 	rtc_read_ticks(alarm_rtc_dev, &elapsed_real_ticks_offset);
 	elapsed_real_ticks_offset =
 		timespec_sub(tmp_time, elapsed_real_ticks_offset);
+	mutex_unlock(&alarm_ticksoffset_mutex);
 #endif
-	spin_unlock_irqrestore(&alarm_slock, flags);
 	return 0;
 }
 

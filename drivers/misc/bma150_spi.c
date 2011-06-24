@@ -10,7 +10,6 @@
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- *
  */
 
 #include <linux/i2c.h>
@@ -26,6 +25,10 @@
 #include <mach/atmega_microp.h>
 
 /*#define EARLY_SUSPEND_BMA 1*/
+#define D(x...) printk(KERN_DEBUG "[GSNR][BMA150 SPI] " x)
+#define E(x...) printk(KERN_ERR "[GSNR][BMA150 SPI ERROR] " x)
+#define DIF(x...) if (debug_flag) \
+			printk(KERN_DEBUG "[GSNR][BMA150 SPI DEBUG] " x)
 
 struct early_suspend bma_early_suspend;
 
@@ -34,11 +37,13 @@ static struct bma150_platform_data *this_pdata;
 static struct mutex gsensor_RW_mutex;
 static struct mutex gsensor_set_mode_mutex;
 
-#define E(x...) printk(KERN_ERR "BMA150_SPI ERROR: " x)
-
 static atomic_t PhoneOn_flag = ATOMIC_INIT(0);
+static atomic_t Disable_flag = ATOMIC_INIT(0);
 #define DEVICE_ACCESSORY_ATTR(_name, _mode, _show, _store) \
 struct device_attribute dev_attr_##_name = __ATTR(_name, _mode, _show, _store)
+
+static int debug_flag;
+
 static int spi_microp_enable(uint8_t on)
 {
 	int ret;
@@ -219,6 +224,8 @@ static int spi_bma150_TransRBuff(short *rbuf)
 		__func__, buffer[0], buffer[1], buffer[2], \
 		buffer[3], buffer[4], buffer[5]);*/
 
+	DIF("%s: (x, y, z) = (%d, %d, %d)\n",
+		__func__, rbuf[0], rbuf[1], rbuf[2]);
 	mutex_unlock(&gsensor_RW_mutex);
 
 	return 1;
@@ -228,11 +235,14 @@ static int __spi_bma150_set_mode(char mode)
 {
 	char buffer[2] = "";
 	int ret;
+
+	if (atomic_read(&Disable_flag) == 1)
+		mode = BMA_MODE_SLEEP;
+
 	mutex_lock(&gsensor_set_mode_mutex);
 	if (mode == BMA_MODE_NORMAL) {
 		spi_microp_enable(1);
-		printk(KERN_INFO "%s: BMA get into NORMAL mode!\n",
-			__func__);
+		printk(KERN_INFO "[GSNR] Gsensor enable\n");
 	}
 
 	buffer[0] = SMB150_CTRL_REG;
@@ -248,8 +258,7 @@ static int __spi_bma150_set_mode(char mode)
 
 	if (mode == BMA_MODE_SLEEP) {
 		spi_microp_enable(0);
-		printk(KERN_INFO "%s: BMA get into SLEEP mode!\n",
-			__func__);
+		printk(KERN_INFO "[GSNR] Gsensor disable\n");
 	}
 	mutex_unlock(&gsensor_set_mode_mutex);
 	return ret;
@@ -269,12 +278,16 @@ static int spi_bma150_release(struct inode *inode, struct file *file)
 static int spi_bma150_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	   unsigned long arg)
 {
+
 	void __user *argp = (void __user *)arg;
+
 	char rwbuf[8] = "";
 	char *toRbuf;
 	int ret = -1;
 	short buf[8], temp;
 	int kbuf = 0;
+
+	DIF("%s: cmd = 0x%x\n", __func__, cmd);
 
 	switch (cmd) {
 	case BMA_IOCTL_READ:
@@ -335,6 +348,8 @@ static int spi_bma150_ioctl(struct inode *inode, struct file *file, unsigned int
 			rwbuf[1] = (this_pdata->gs_kvalue >>  8) & 0xFF;
 			rwbuf[2] =  this_pdata->gs_kvalue        & 0xFF;
 		}
+		DIF("%s: CALI(x, y, z) = (%d, %d, %d)\n",
+			__func__, rwbuf[0], rwbuf[1], rwbuf[2]);
 		break;
 	case BMA_IOCTL_SET_MODE:
 		/*printk(KERN_DEBUG
@@ -428,6 +443,12 @@ static void bma150_early_suspend(struct early_suspend *handler)
 
 static void bma150_early_resume(struct early_suspend *handler)
 {
+	int ret = 0;
+
+	ret = __spi_bma150_set_mode(BMA_MODE_NORMAL);
+	if (ret < 0)
+		printk(KERN_ERR "%s: __spi_bma150_set_mode FAIL!\n", __func__);
+
 	/*printk(KERN_DEBUG
 		"%s: spi_bma150_set_mode returned = %d!\n",
 			__func__, ret);*/
@@ -448,6 +469,12 @@ static int bma150_suspend(struct device *device)
 
 static int bma150_resume(struct device *device)
 {
+	int ret = 0;
+
+	ret = __spi_bma150_set_mode(BMA_MODE_NORMAL);
+	if (ret < 0)
+		printk(KERN_ERR "%s: __spi_bma150_set_mode FAIL!\n", __func__);
+
 	return 0;
 }
 #endif /* EARLY_SUSPEND_BMA */
@@ -484,11 +511,97 @@ static ssize_t spi_bma150_store(struct device *dev,
 static DEVICE_ACCESSORY_ATTR(PhoneOnOffFlag, 0664, \
 	spi_bma150_show, spi_bma150_store);
 
+static ssize_t spi_dis_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	char *s = buf;
+	s += sprintf(s, "%d\n", atomic_read(&Disable_flag));
+	return s - buf;
+}
+
+static ssize_t spi_dis_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	int dis_g;
+	int ret = -1;
+
+	dis_g = -1;
+	sscanf(buf, "%d", &dis_g);
+
+	if (dis_g != 0 && dis_g != 1)
+		return -EINVAL;
+
+	if (dis_g) {
+		atomic_set(&Disable_flag, 1);
+		printk(KERN_DEBUG "%s: Disable_flag = %d\n",
+			__func__, atomic_read(&Disable_flag));
+
+		ret = __spi_bma150_set_mode(BMA_MODE_SLEEP);
+		if (ret < 0)
+			return ret;
+	} else {
+		atomic_set(&Disable_flag, 0);
+		printk(KERN_DEBUG "%s: Disable_flag = %d\n",
+			__func__, atomic_read(&Disable_flag));
+
+		ret = __spi_bma150_set_mode(BMA_MODE_NORMAL);
+		if (ret < 0)
+			return ret;
+	}
+
+	return count;
+}
+
+static DEVICE_ACCESSORY_ATTR(Disable_flag, 0664, \
+	spi_dis_show, spi_dis_store);
+
+static ssize_t debug_flag_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	char *s = buf;
+	char buffer, range = -1, bandwidth = -1, mode = -1;
+	int ret;
+
+	buffer = RANGE_BWIDTH_REG;
+	if (spi_gsensor_read(&buffer) < 0)
+		return -EIO;
+	range = (buffer & 0x18) >> 3;
+	bandwidth = (buffer & 0x7);
+
+	buffer = SMB150_CTRL_REG;
+	ret = spi_gsensor_read(&buffer);
+	if (ret < 0) {
+		mutex_unlock(&gsensor_set_mode_mutex);
+		return -1;
+	}
+	mode = (buffer & 0x1);
+
+	s += sprintf(s, "debug_flag = %d, range = 0x%x, bandwidth = 0x%x, "
+		"mode = 0x%x\n", debug_flag, range, bandwidth, mode);
+
+	return s - buf;
+}
+static ssize_t debug_flag_store(struct device *dev,
+				   struct device_attribute *attr,
+				   const char *buf, size_t count)
+{
+	debug_flag = -1;
+	sscanf(buf, "%d", &debug_flag);
+
+	return count;
+
+}
+
+static DEVICE_ACCESSORY_ATTR(debug_en, 0664, \
+	debug_flag_show, debug_flag_store);
+
 int spi_bma150_registerAttr(void)
 {
 	int ret;
 	struct class *htc_accelerometer_class;
 	struct device *accelerometer_dev;
+	struct device *disable_dev;
 
 	htc_accelerometer_class = class_create(THIS_MODULE, "htc_accelerometer");
 	if (IS_ERR(htc_accelerometer_class)) {
@@ -505,14 +618,38 @@ int spi_bma150_registerAttr(void)
 		goto err_create_accelerometer_device;
 	}
 
+	disable_dev = device_create(htc_accelerometer_class,
+				NULL, 0, "%s", "disable_g");
+	if (unlikely(IS_ERR(disable_dev))) {
+		ret = PTR_ERR(disable_dev);
+		disable_dev = NULL;
+		goto err_create_disable_device;
+	}
+
 	/* register the attributes */
 	ret = device_create_file(accelerometer_dev, &dev_attr_PhoneOnOffFlag);
 	if (ret)
 		goto err_create_accelerometer_device_file;
 
+	/* register the debug_en attributes */
+	ret = device_create_file(accelerometer_dev, &dev_attr_debug_en);
+	if (ret)
+		goto err_create_accelerometer_debug_en_device_file;
+
+	/* register the attributes */
+	ret = device_create_file(disable_dev, &dev_attr_Disable_flag);
+	if (ret)
+		goto err_create_disable_device_file;
+
 	return 0;
 
+err_create_disable_device_file:
+	device_remove_file(accelerometer_dev, &dev_attr_debug_en);
+err_create_accelerometer_debug_en_device_file:
+	device_remove_file(accelerometer_dev, &dev_attr_PhoneOnOffFlag);
 err_create_accelerometer_device_file:
+	device_unregister(disable_dev);
+err_create_disable_device:
 	device_unregister(accelerometer_dev);
 err_create_accelerometer_device:
 	class_destroy(htc_accelerometer_class);
@@ -574,6 +711,9 @@ static int spi_gsensor_initial(void)
 		E("%s: set spi_bma150_registerAttr fail!\n", __func__);
 		goto err_registerAttr;
 	}
+
+	debug_flag = 0;
+
 	return 0;
 
 err_registerAttr:

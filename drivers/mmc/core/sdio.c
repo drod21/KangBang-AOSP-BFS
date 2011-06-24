@@ -361,9 +361,23 @@ static int mmc_sdio_init_card(struct mmc_host *host, u32 ocr,
 		 * high-speed, but it seems that 50 MHz is
 		 * mandatory.
 		 */
+#ifndef CONFIG_SDIO_CES
 		mmc_set_clock(host, 50000000);
+#else
+        printk("[WLAN][CES] set 25M\n");
+      	mmc_set_clock(host, 25000000);
+#endif
 	} else {
-		mmc_set_clock(host, card->cis.max_dtr);
+#ifdef CONFIG_WIMAX
+		mmc_set_clock(host, 49152000);
+#else
+#ifndef CONFIG_SDIO_CES
+     mmc_set_clock(host, card->cis.max_dtr);
+#else
+     printk("[WLAN][CES] set 25M in max_dtr\n");
+     mmc_set_clock(host, 25000000);
+#endif
+#endif
 	}
 
 	/*
@@ -698,9 +712,23 @@ int sdio_reset_comm(struct mmc_card *card)
 		 * high-speed, but it seems that 50 MHz is
 		 * mandatory.
 		 */
-		mmc_set_clock(host, 50000000);
+#ifndef CONFIG_SDIO_CES
+        mmc_set_clock(host, 50000000);
+#else 
+        printk("[WLAN][CES] set 25M-2\n");
+        mmc_set_clock(host, 25000000);
+#endif
 	} else {
+#ifdef CONFIG_WIMAX
+		mmc_set_clock(host, 49152000);
+#else
+#ifndef CONFIG_SDIO_CES
 		mmc_set_clock(host, card->cis.max_dtr);
+#else
+        printk("[WLAN][CES] set 25M-2 in max_dtr\n");
+        mmc_set_clock(host, 25000000);
+#endif
+#endif
 	}
 
 	err = sdio_enable_wide(card);

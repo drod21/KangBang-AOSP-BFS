@@ -28,3 +28,6 @@ obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
 
 obj-$(CONFIG_XEN_KBDDEV_FRONTEND)	+= xen-kbdfront.o
 obj-$(CONFIG_INPUT_OPTICALJOYSTICK)		+= opticaljoystick/
+
+# For VNC use
+obj-$(CONFIG_INPUT_VNCINPUT)	+= vnc_input.o

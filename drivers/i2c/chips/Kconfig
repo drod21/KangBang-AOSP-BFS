@@ -44,6 +44,18 @@ config SENSORS_AKM8975
         help
          AKM8975 Compass Driver implemented by HTC.
 
+config SENSORS_CAPSENSE
+	tristate "CapSense Driver"
+	depends on I2C
+	help
+	 CapSense Driver implemented by HTC.
+
+config SENSORS_CAPSENSE_EXPRESS
+	tristate "CapSense Express Driver"
+	depends on I2C
+	help
+	 CapSense Express Driver implemented by HTC.
+
 config SMB329
 	tristate "smb329 Driver"
 	depends on I2C
@@ -115,11 +127,29 @@ config AMP_TPA2051D3
         help
          TI TPA2051D3 Speaker AMP Driver implemented by HTC.
 
+config AMP_TPA2026
+	tristate "TI TPA2026 Speaker AMP Driver"
+	depends on I2C
+	help
+	 TI TPA2026 Speaker AMP Driver implemented by HTC.
+
+config AMP_TPA2028
+	tristate "TI TPA2028 Speaker AMP Driver"
+	depends on I2C
+	help
+	 TI TPA2028 Speaker AMP Driver implemented by HTC.
+
 config INPUT_ISL29028
 	tristate "ISL29028 proximity and light sensor"
 	help
 	  Say Y here to enable the ISL29028 Short Distance Proximity
 	  Sensor with Ambient Light Sensor.
+
+config INPUT_ISL29029
+	tristate "ISL29029 proximity and light sensor"
+	help
+	 Say Y here to enable the ISL29029 Short Distance Proximity
+	 Sensor with Ambient Light Sensor.
 
 config INPUT_CAPELLA_CM3628
 	tristate "CM3628 proximity and light sensor"

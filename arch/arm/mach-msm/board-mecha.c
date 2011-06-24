@@ -28,7 +28,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-msm.h>
 #include <linux/spi/spi.h>
-#include <mach/qdsp5v2/msm_lpa.h>
+#include <mach/qdsp5v2_1x/msm_lpa.h>
 #include <linux/akm8975.h>
 #include <linux/bma150.h>
 #include <linux/capella_cm3602.h>
@@ -141,7 +141,6 @@ static struct usb_mass_storage_platform_data mass_storage_pdata = {
 	.vendor		= "HTC",
 	.product	= "Android Phone",
 	.release	= 0x0100,
-	.cdrom_lun	= 2,
 };
 
 static struct platform_device usb_mass_storage_device = {
@@ -151,6 +150,22 @@ static struct platform_device usb_mass_storage_device = {
 		.platform_data = &mass_storage_pdata,
 	},
 };
+
+#ifdef CONFIG_USB_ANDROID_RNDIS
+static struct usb_ether_platform_data rndis_pdata = {
+	/* ethaddr is filled by board_serialno_setup */
+	.vendorID       = 0x18d1,
+	.vendorDescr    = "Google, Inc.",
+};
+
+static struct platform_device rndis_device = {
+	.name   = "rndis",
+	.id     = -1,
+	.dev    = {
+		.platform_data = &rndis_pdata,
+	},
+};
+#endif
 
 static struct android_usb_platform_data android_usb_pdata = {
 	.vendor_id		= 0x0bb4,
@@ -297,7 +312,9 @@ static void mecha_add_usb_devices(void)
 	/* config_mecha_usb_id_gpios(0);*/
 	mecha_change_phy_voltage(0);
 	platform_device_register(&msm_device_hsusb);
-//	config_mecha_usb_uart_gpios();
+#ifdef CONFIG_USB_ANDROID_RNDIS
+	platform_device_register(&rndis_device);
+#endif
 	platform_device_register(&usb_mass_storage_device);
 	platform_device_register(&android_usb_device);
 }
@@ -1610,7 +1627,7 @@ static void __init msm7x30_init_marimba(void)
 		return;
 	}
 }
-#ifdef CONFIG_MSM7KV2_AUDIO
+#ifdef CONFIG_MSM7KV2_1X_AUDIO
 static struct resource msm_aictl_resources[] = {
 	{
 		.name = "aictl",
@@ -1892,7 +1909,7 @@ static void __init aux_pcm_gpio_init(void)
 	config_gpio_table(aux_pcm_gpio_off,
 		ARRAY_SIZE(aux_pcm_gpio_off));
 }
-#endif /* CONFIG_MSM7KV2_AUDIO */
+#endif /* CONFIG_MSM7KV2_1X_AUDIO */
 
 static struct msm_sdio_al_platform_data mdm2ap_status_gpio_data = {
 	.mdm2ap_status_gpio_id = MECHA_GPIO_MDM2AP_STATUS,	 /* MDM2AP_STATUS  */
@@ -2023,6 +2040,8 @@ static int msm_qsd_spi_dma_config(void)
 #endif
 static struct msm_spi_platform_data qsd_spi_pdata = {
 	.max_clock_speed = 26000000,
+	.clk_name = "spi_clk",
+	.pclk_name = "spi_pclk",
 	.gpio_config  = msm_qsd_spi_gpio_config,
 	.gpio_release = msm_qsd_spi_gpio_release,
 //	.dma_config = msm_qsd_spi_dma_config,
@@ -2272,24 +2291,24 @@ static struct platform_device mecha_flashlight_device = {
 };
 #if defined(CONFIG_SERIAL_MSM_HS) && defined(CONFIG_SERIAL_MSM_HS_PURE_ANDROID)
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-        .rx_wakeup_irq = -1,
-        .inject_rx_on_wakeup = 0,
-        .exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
+	.rx_wakeup_irq = -1,
+	.inject_rx_on_wakeup = 0,
+	.exit_lpm_cb = bcm_bt_lpm_exit_lpm_locked,
 };
 
 static struct bcm_bt_lpm_platform_data bcm_bt_lpm_pdata = {
-        .gpio_wake = MECHA_GPIO_BT_CHIP_WAKE,
-        .gpio_host_wake = MECHA_GPIO_BT_HOST_WAKE,
-        .request_clock_off_locked = msm_hs_request_clock_off_locked,
-        .request_clock_on_locked = msm_hs_request_clock_on_locked,
+	.gpio_wake = MECHA_GPIO_BT_CHIP_WAKE,
+	.gpio_host_wake = MECHA_GPIO_BT_HOST_WAKE,
+	.request_clock_off_locked = msm_hs_request_clock_off_locked,
+	.request_clock_on_locked = msm_hs_request_clock_on_locked,
 };
 
 struct platform_device bcm_bt_lpm_device = {
-        .name = "bcm_bt_lpm",
-        .id = 0,
-        .dev = {
-                .platform_data = &bcm_bt_lpm_pdata,
-        },
+	.name = "bcm_bt_lpm",
+	.id = 0,
+	.dev = {
+		.platform_data = &bcm_bt_lpm_pdata,
+	},
 };
 
 #define ATAG_BDADDR 0x43294329  /* mahimahi bluetooth address tag */
@@ -2303,28 +2322,28 @@ MODULE_PARM_DESC(bdaddr, "bluetooth address");
 
 static int __init parse_tag_bdaddr(const struct tag *tag)
 {
-        unsigned char *b = (unsigned char *)&tag->u;
+	unsigned char *b = (unsigned char *)&tag->u;
 
-        if (tag->hdr.size != ATAG_BDADDR_SIZE)
-                return -EINVAL;
+	if (tag->hdr.size != ATAG_BDADDR_SIZE)
+		return -EINVAL;
 
-        snprintf(bdaddr, BDADDR_STR_SIZE, "%02X:%02X:%02X:%02X:%02X:%02X",
-                b[0], b[1], b[2], b[3], b[4], b[5]);
+	snprintf(bdaddr, BDADDR_STR_SIZE, "%02X:%02X:%02X:%02X:%02X:%02X",
+		b[0], b[1], b[2], b[3], b[4], b[5]);
 
-        return 0;
+	return 0;
 }
 
 __tagtable(ATAG_BDADDR, parse_tag_bdaddr);
 #elif defined(CONFIG_SERIAL_MSM_HS)
 static struct msm_serial_hs_platform_data msm_uart_dm1_pdata = {
-        .rx_wakeup_irq = MSM_GPIO_TO_INT(MECHA_GPIO_BT_HOST_WAKE),
-        .inject_rx_on_wakeup = 0,
-        .cpu_lock_supported = 1,
+	.rx_wakeup_irq = MSM_GPIO_TO_INT(MECHA_GPIO_BT_HOST_WAKE),
+	.inject_rx_on_wakeup = 0,
+	.cpu_lock_supported = 1,
 
-        /* for bcm */
-        .bt_wakeup_pin_supported = 1,
-        .bt_wakeup_pin = MECHA_GPIO_BT_CHIP_WAKE,
-        .host_wakeup_pin = MECHA_GPIO_BT_HOST_WAKE,
+	/* for bcm */
+	.bt_wakeup_pin_supported = 1,
+	.bt_wakeup_pin = MECHA_GPIO_BT_CHIP_WAKE,
+	.host_wakeup_pin = MECHA_GPIO_BT_HOST_WAKE,
 };
 
 /* for bcm */
@@ -2333,12 +2352,12 @@ extern unsigned char *get_bt_bd_ram(void);
 
 static void bt_export_bd_address(void)
 {
-        unsigned char cTemp[6];
+	unsigned char cTemp[6];
 
-        memcpy(cTemp, get_bt_bd_ram(), 6);
-        sprintf(bdaddress, "%02x:%02x:%02x:%02x:%02x:%02x",
-                cTemp[0], cTemp[1], cTemp[2], cTemp[3], cTemp[4], cTemp[5]);
-        printk(KERN_INFO "YoYo--BD_ADDRESS=%s\n", bdaddress);
+	memcpy(cTemp, get_bt_bd_ram(), 6);
+	sprintf(bdaddress, "%02x:%02x:%02x:%02x:%02x:%02x",
+		cTemp[0], cTemp[1], cTemp[2], cTemp[3], cTemp[4], cTemp[5]);
+	printk(KERN_INFO "YoYo--BD_ADDRESS=%s\n", bdaddress);
 }
 
 module_param_string(bdaddress, bdaddress, sizeof(bdaddress), S_IWUSR | S_IRUGO);
@@ -2356,7 +2375,7 @@ MODULE_PARM_DESC(bt_fw_version, "BT's fw version");
 static struct platform_device *devices[] __initdata = {
 	&msm_device_uart3,
 #ifdef CONFIG_SERIAL_MSM_HS_PURE_ANDROID
-        &bcm_bt_lpm_device,
+	&bcm_bt_lpm_device,
 #endif
 	&msm_device_smd,
 	&mecha_rfkill,
@@ -2372,7 +2391,7 @@ static struct platform_device *devices[] __initdata = {
 	&qup_device_i2c,
 	&htc_headset_mgr,
 	&htc_battery_pdev,
-#ifdef CONFIG_MSM7KV2_AUDIO
+#ifdef CONFIG_MSM7KV2_1X_AUDIO
 	&msm_aictl_device,
 	&msm_mi2s_device,
 	&msm_lpa_device,
@@ -2383,7 +2402,7 @@ static struct platform_device *devices[] __initdata = {
 #ifdef CONFIG_MSM_GEMINI
 	&msm_gemini_device,
 #endif
-#ifdef CONFIG_MSM7KV2_AUDIO
+#ifdef CONFIG_MSM7KV2_1X_AUDIO
 	&msm_aux_pcm_device,
 #endif
 #ifdef CONFIG_S5K3H1GX
@@ -2710,7 +2729,7 @@ static void __init mecha_init(void)
 	msm_device_i2c_init();
 	qup_device_i2c_init();
 	msm7x30_init_marimba();
-#ifdef CONFIG_MSM7KV2_AUDIO
+#ifdef CONFIG_MSM7KV2_1X_AUDIO
 	msm_snddev_init();
 	aux_pcm_gpio_init();
 #endif
@@ -2719,7 +2738,7 @@ static void __init mecha_init(void)
 	i2c_register_board_info(4 /* QUP ID */, msm_camera_boardinfo,
 				ARRAY_SIZE(msm_camera_boardinfo));
 
-	msm_init_pmic_vibrator();
+	msm_init_pmic_vibrator(3000);
 #ifdef CONFIG_MICROP_COMMON
 	mecha_microp_init();
 #endif

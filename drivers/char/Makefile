@@ -69,8 +69,9 @@ obj-$(CONFIG_BFIN_OTP)		+= bfin-otp.o
 obj-$(CONFIG_PRINTER)		+= lp.o
 
 obj-$(CONFIG_APM_EMULATION)	+= apm-emulation.o
-
+ifeq ($(CONFIG_USB_ANDROID_QCT_DIAG),y)
 obj-$(CONFIG_DIAG_CHAR)         += diag/
+endif
 
 obj-$(CONFIG_DTLK)		+= dtlk.o
 obj-$(CONFIG_R3964)		+= n_r3964.o
@@ -115,6 +116,8 @@ obj-$(CONFIG_RAMOOPS)		+= ramoops.o
 
 obj-$(CONFIG_JS_RTC)		+= js-rtc.o
 js-rtc-y = rtc.o
+
+obj-$(CONFIG_MMC_GENERIC_CSDIO)	+= csdio.o
 
 # Files generated that shall be removed upon make clean
 clean-files := consolemap_deftbl.c defkeymap.c
