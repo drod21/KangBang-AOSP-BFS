@@ -64,7 +64,7 @@ static unsigned int samples = 0;
 static unsigned long min_sample_time;
 
 static unsigned int freq_threshold = 1800000;
-static unsigned int resume_speed = 1400000;
+static unsigned int resume_speed = 1408000;
 
 static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 		unsigned int event);
@@ -73,7 +73,7 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *policy,
 static
 #endif
 struct cpufreq_governor cpufreq_gov_interactive = {
-	.name = "interactive",
+	.name = "interactiveX",
 	.governor = cpufreq_governor_interactive,
 	.max_transition_latency = 10000000,
 	.owner = THIS_MODULE,
@@ -208,7 +208,11 @@ static void cpufreq_interactive_freq_change_time_work(struct work_struct *work)
 	cpumask_t tmp_mask = work_cpumask;
 
 	for_each_cpu(cpu, tmp_mask) {
-		if (!suspended && (target_freq == policy->max || target_freq == freq_threshold)) {
+		if (!suspended && (target_freq >= freq_threshold || target_freq == policy->max) ) {
+			if (policy->cur < 400000) {
+			  // avoid quick jump from lowest to highest
+			  target_freq = resume_speed;
+			}
 			if (nr_running() == 1) {
 				cpumask_clear_cpu(cpu, &work_cpumask);
 				return;
@@ -317,8 +321,9 @@ static int cpufreq_governor_interactive(struct cpufreq_policy *new_policy,
 		pm_idle = cpufreq_idle;
 		policy = new_policy;
 		enabled = 1;
+
         	register_early_suspend(&interactive_power_suspend);
-        	pr_info("[imoseyon] interactive active\n");
+        	pr_info("[imoseyon] interactive start - freq_threshold at %d, resume at %d\n", freq_threshold, resume_speed);
 		break;
 
 	case CPUFREQ_GOV_STOP:
@@ -362,7 +367,7 @@ static int __init cpufreq_interactive_init(void)
 	}
 
 	/* Scale up is high priority */
-	up_wq = create_rt_workqueue("kinteractive_up");
+	up_wq = alloc_workqueue("kinteractive_up", WQ_HIGHPRI | WQ_CPU_INTENSIVE, 1);
 	down_wq = create_workqueue("knteractive_down");
 
 	INIT_WORK(&freq_scale_work, cpufreq_interactive_freq_change_time_work);
