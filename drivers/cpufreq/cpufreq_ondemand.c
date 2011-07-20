@@ -577,10 +577,10 @@ CPUFREQ_RELATION_L);
 }
 }
 
-	unsigned int max_load_freq;
+	//unsigned int max_load_freq;
 
-	struct cpufreq_policy *policy;
-	unsigned int j;
+	//struct cpufreq_policy *policy;
+	//unsigned int j;
 
 	this_dbs_info->freq_lo = 0;
 	policy = this_dbs_info->cur_policy;
